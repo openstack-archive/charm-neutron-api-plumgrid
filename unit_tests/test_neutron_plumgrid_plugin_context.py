@@ -87,5 +87,9 @@ class NeutronPGContextTest(CharmTestCase):
             'service_protocol': 'http',
             'auth_port': '35357',
             'auth_host': '10.0.0.1',
+            'metadata_mode': 'tunnel',
+            'nova_metadata_proxy_secret': 'plumgrid',
+            'pg_metadata_ip': '169.254.169.254',
+            'pg_metadata_port': '8775',
         }
         self.assertEquals(expect, napi_ctxt())

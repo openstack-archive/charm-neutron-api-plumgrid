@@ -11,6 +11,22 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.contrib.openstack import context
 
 
+def _edge_settings():
+    '''
+    Inspects plumgrid-edge relation to get metadata shared secret.
+    '''
+    ctxt = {
+        'metadata_shared_secret': 'plumgrid',
+    }
+    for rid in relation_ids('plumgrid-plugin'):
+        for unit in related_units(rid):
+            rdata = relation_get(rid=rid, unit=unit)
+            if 'metadata-shared-secret' in rdata:
+                ctxt['metadata_shared_secret'] = \
+                    rdata['metadata-shared-secret']
+    return ctxt
+
+
 def _container_settings():
     '''
     Inspects current container relation to get keystone context.
@@ -87,11 +103,16 @@ class NeutronPGPluginContext(context.NeutronContext):
             return {}
 
         conf = config()
-        pg_ctxt['enable_metadata'] = conf['enable-metadata']
+        enable_metadata = conf['enable-metadata']
+        pg_ctxt['enable_metadata'] = enable_metadata
         pg_ctxt['pg_metadata_ip'] = '169.254.169.254'
         pg_ctxt['pg_metadata_port'] = '8775'
-        pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
         pg_ctxt['metadata_mode'] = 'tunnel'
+        if enable_metadata:
+            plumgrid_edge_settings = _edge_settings()
+            pg_ctxt['nova_metadata_proxy_secret'] = plumgrid_edge_settings['metadata_shared_secret']
+        else:
+            pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
 
         neutron_api_settings = _container_settings()
         pg_ctxt['admin_user'] = neutron_api_settings['service_username']

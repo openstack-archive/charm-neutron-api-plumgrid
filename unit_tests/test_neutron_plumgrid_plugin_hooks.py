@@ -47,8 +47,7 @@ class NeutronPGHooksTests(CharmTestCase):
         self.apt_update.assert_called_with()
         self.apt_install.assert_has_calls([
             call(_pkgs, fatal=True,
-                 options=['--force-yes',
-                          '--option=Dpkg::Options::=--force-confold']),
+                 options=['--force-yes']),
         ])
         self.ensure_files.assert_called_with()
 
@@ -60,8 +59,7 @@ class NeutronPGHooksTests(CharmTestCase):
         self.apt_update.assert_called_with()
         self.apt_install.assert_has_calls([
             call(_pkgs, fatal=True,
-                 options=['--force-yes',
-                          '--option=Dpkg::Options::=--force-confold']),
+                 options=['--force-yes']),
         ])
         self.ensure_files.assert_called_with()
         self.CONFIGS.write_all.assert_called_with()
