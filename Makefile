@@ -19,5 +19,9 @@ sync: bin/charm_helpers_sync.py
 	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-sync.yaml
 
 publish: lint unit_test
-	bzr push lp:charms/neutron-plumgrid-plugin
-	bzr push lp:charms/trusty/neutron-plumgrid-plugin
+	bzr push lp:charms/neutron-api-plumgrid
+	bzr push lp:charms/trusty/neutron-api-plumgrid
+
+test:
+	@echo Starting Amulet tests...
+	@juju test -v -p AMULET_HTTP_PROXY,AMULET_OS_VIP --timeout 2700

@@ -9,7 +9,7 @@ class TestDeployment(unittest.TestCase):
     def setUpClass(cls):
         cls.deployment = amulet.Deployment(series='trusty')
         cls.deployment.load_bundle_file(
-            bundle_file='files/neutron-plumgrid-plugin.yaml',
+            bundle_file='files/neutron-api-plumgrid.yaml',
             deployment_name='test')
         try:
             cls.deployment.setup(timeout=2000)
@@ -22,7 +22,7 @@ class TestDeployment(unittest.TestCase):
 
     def test_packages_installed(self):
         pg_sentry = self.deployment.sentry['neutron-api/0']
-        for package in {'plumgrid-pythonlib', 'plumgrid-puppet'}:
+        for package in {'plumgrid-pythonlib'}:
             output, code = pg_sentry.run("dpkg -l {}".format(package))
             if code != 0:
                 message = "{} package not found.".format(package)
