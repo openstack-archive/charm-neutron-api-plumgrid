@@ -1,6 +1,7 @@
 # Copyright (c) 2015, PLUMgrid Inc, http://plumgrid.com
 
-# This file contains the class that generates context for PLUMgrid template files.
+# This file contains the class that generates context for
+# PLUMgrid template files.
 
 from charmhelpers.core.hookenv import (
     config,
@@ -96,7 +97,8 @@ class NeutronPGPluginContext(context.NeutronContext):
 
     def pg_ctxt(self):
         '''
-        Generated Config for all PLUMgrid templates inside the templates folder.
+        Generated Config for all PLUMgrid templates inside the
+        templates folder.
         '''
         pg_ctxt = super(NeutronPGPluginContext, self).pg_ctxt()
         if not pg_ctxt:
@@ -110,7 +112,8 @@ class NeutronPGPluginContext(context.NeutronContext):
         pg_ctxt['metadata_mode'] = 'tunnel'
         if enable_metadata:
             plumgrid_edge_settings = _edge_settings()
-            pg_ctxt['nova_metadata_proxy_secret'] = plumgrid_edge_settings['metadata_shared_secret']
+            pg_ctxt['nova_metadata_proxy_secret'] = \
+                plumgrid_edge_settings['metadata_shared_secret']
         else:
             pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
 

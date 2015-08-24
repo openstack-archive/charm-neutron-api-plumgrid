@@ -8,7 +8,7 @@ It is a subordinate charm to neutron-api charm.
 
 # Usage
 
-Step by step instructions on using the charm:
+Instructions on using the charm:
 
     juju deploy neutron-api
     juju deploy neutron-api-plumgrid

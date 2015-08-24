@@ -43,7 +43,8 @@ class NeutronPGContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'unit_private_ip')
     def test_neutroncc_context_api_rel(self, _unit_priv_ip, _npa, _ens_pkgs,
                                        _save_ff, _https, _is_clus, _unit_get,
-                                       _config, _runits, _rids, _rget, _con_settings):
+                                       _config, _runits, _rids, _rget,
+                                       _con_settings):
         def mock_npa(plugin, section, manager):
             if section == "driver":
                 return "neutron.randomdriver"
