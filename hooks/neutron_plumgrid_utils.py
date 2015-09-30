@@ -61,6 +61,9 @@ def register_configs(release=None):
     the context required for all templates of this charm.
     '''
     release = release or os_release('neutron-server', base='kilo')
+    if release < 'kilo':
+        raise ValueError('OpenStack %s release not supported' % release)
+
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
     for cfg, rscs in resource_map().iteritems():
