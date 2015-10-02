@@ -24,6 +24,7 @@ TO_PATCH = [
     'CONFIGS',
     'ensure_files',
     'stop',
+    'determine_packages',
 ]
 NEUTRON_CONF_DIR = "/etc/neutron"
 
@@ -42,6 +43,7 @@ class NeutronPGHooksTests(CharmTestCase):
 
     def test_install_hook(self):
         _pkgs = ['plumgrid-pythonlib']
+        self.determine_packages.return_value = [_pkgs]
         self._call_hook('install')
         self.configure_sources.assert_called_with()
         self.apt_update.assert_called_with()
@@ -53,6 +55,7 @@ class NeutronPGHooksTests(CharmTestCase):
 
     def test_config_changed_hook(self):
         _pkgs = ['plumgrid-pythonlib']
+        self.determine_packages.return_value = [_pkgs]
         self._call_hook('config-changed')
         self.stop.assert_called_with()
         self.configure_sources.assert_called_with()
@@ -75,7 +78,8 @@ class NeutronPGHooksTests(CharmTestCase):
         self.CONFIGS.write_all.assert_called_with()
 
     def test_stop(self):
-        _pkgs = 'plumgrid-pythonlib'
+        _pkgs = ['plumgrid-pythonlib']
+        self.determine_packages.return_value = [_pkgs]
         self._call_hook('stop')
         self.apt_purge.assert_has_calls([
             call(_pkgs, fatal=False)
