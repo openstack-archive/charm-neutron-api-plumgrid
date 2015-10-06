@@ -36,11 +36,6 @@ class TestNeutronPGUtils(CharmTestCase):
         # Reset cached cache
         hookenv.cache = {}
 
-    def test_determine_packages(self):
-        pkg_list = nutils.determine_packages()
-        expect = ['plumgrid-pythonlib']
-        self.assertItemsEqual(pkg_list, expect)
-
     def test_register_configs(self):
         class _mock_OSConfigRenderer():
             def __init__(self, templates_dir=None, openstack_release=None):

@@ -8,7 +8,12 @@ from copy import deepcopy
 import os
 from charmhelpers.contrib.openstack import templating
 from charmhelpers.contrib.python.packages import pip_install
-
+from charmhelpers.fetch import (
+    apt_cache
+)
+from charmhelpers.core.hookenv import (
+    config,
+)
 from charmhelpers.contrib.openstack.utils import (
     os_release,
 )
@@ -43,7 +48,21 @@ def determine_packages():
     Returns list of packages required to be installed alongside neutron to
     enable PLUMgrid in Openstack.
     '''
-    return list(set(PG_PACKAGES))
+    pkgs = []
+    tag = config('plumgrid-build')
+    for pkg in PG_PACKAGES:
+        if tag == 'latest':
+            pkgs.append(pkg)
+        else:
+            if tag in [i.ver_str for i in apt_cache()[pkg].version_list]:
+                pkgs.append('%s=%s' % (pkg, tag))
+            else:
+                error_msg = \
+                    "Build version '%s' for package '%s' not available" \
+                    % (tag, pkg)
+                raise ValueError(error_msg)
+    # return list(set(PG_PACKAGES))
+    return pkgs
 
 
 def resource_map():

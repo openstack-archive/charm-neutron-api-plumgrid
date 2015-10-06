@@ -42,7 +42,9 @@ def install():
     '''
     configure_sources()
     apt_update()
-    apt_install(determine_packages(), options=['--force-yes'], fatal=True)
+    pkgs = determine_packages()
+    for pkg in pkgs:
+        apt_install(pkg, options=['--force-yes'], fatal=True)
     ensure_files()
 
 
@@ -55,7 +57,9 @@ def config_changed():
     stop()
     configure_sources()
     apt_update()
-    apt_install(determine_packages(), options=['--force-yes'], fatal=True)
+    pkgs = determine_packages()
+    for pkg in pkgs:
+        apt_install(pkg, options=['--force-yes'], fatal=True)
     ensure_files()
     CONFIGS.write_all()
 
