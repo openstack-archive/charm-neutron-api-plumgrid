@@ -16,3 +16,8 @@ options:
     type: string
     description: |
        Provide the build version of PLUMgrid packages that needs to be installed
+  networking-plumgrid-version:
+    default: null
+    type: string
+    description: |
+       Provide the version of networking-plumgrid package that needs to be installed
