@@ -6,6 +6,7 @@
 # in this file.
 
 import sys
+from charmhelpers.contrib.python.packages import pip_uninstall
 
 from charmhelpers.core.hookenv import (
     Hooks,
@@ -85,6 +86,7 @@ def stop():
     pkgs = determine_packages()
     for pkg in pkgs:
         apt_purge(pkg, fatal=False)
+    pip_uninstall('networking-plumgrid')
 
 
 def main():

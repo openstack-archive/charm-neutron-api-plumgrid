@@ -25,6 +25,7 @@ TO_PATCH = [
     'ensure_files',
     'stop',
     'determine_packages',
+    'pip_uninstall',
 ]
 NEUTRON_CONF_DIR = "/etc/neutron"
 
@@ -84,3 +85,4 @@ class NeutronPGHooksTests(CharmTestCase):
         self.apt_purge.assert_has_calls([
             call(_pkgs, fatal=False)
         ])
+        self.pip_uninstall.assert_called_with('networking-plumgrid')

@@ -42,6 +42,11 @@ BASE_RESOURCE_MAP = OrderedDict([
     }),
 ])
 
+NETWORKING_PLUMGRID_VERSION = OrderedDict([
+    ('kilo', '2015.1.1.1'),
+    ('liberty', '2015.2.1.1'),
+])
+
 
 def determine_packages():
     '''
@@ -104,5 +109,18 @@ def ensure_files():
     '''
     Ensures PLUMgrid specific files exist before templates are written.
     '''
-    pip_install('networking-plumgrid', fatal=True)
+    install_networking_plumgrid()
     os.chmod('/etc/sudoers.d/neutron_sudoers', 0o440)
+
+
+def install_networking_plumgrid():
+    '''
+    Installs networking-plumgrid package
+    '''
+    release = os_release('neutron-server', base='kilo')
+    if config('networking-plumgrid-version') is None:
+        package_version = NETWORKING_PLUMGRID_VERSION[release]
+    else:
+        package_version = config('networking-plumgrid-version')
+    package_name = 'networking-plumgrid==%s' % package_version
+    pip_install(package_name, fatal=True)
