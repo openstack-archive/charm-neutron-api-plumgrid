@@ -18,9 +18,14 @@ tags:
   - openstack
 subordinate: true
 provides:
+  neutron-plugin-api-subordinate:
+    interface: neutron-plugin-api-subordinate
+    scope: container
   plumgrid-plugin:
     interface: plumgrid-plugin
 requires:
   container:
-    interface: neutron-plugin-api
+    interface: juju-info
     scope: container
+  identity-admin:
+    interface: keystone-admin

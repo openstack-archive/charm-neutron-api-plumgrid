@@ -24,16 +24,22 @@ TEMPLATES = 'templates/'
 
 PG_PACKAGES = [
     'plumgrid-pythonlib',
+    'neutron-plugin-plumgrid'
 ]
 
 NEUTRON_CONF_DIR = "/etc/neutron"
 
 SU_FILE = '/etc/sudoers.d/neutron_sudoers'
+PLUMGRID_CONF = '%s/plugins/plumgrid/plumgrid.ini' % NEUTRON_CONF_DIR
 PGLIB_CONF = '%s/plugins/plumgrid/plumlib.ini' % NEUTRON_CONF_DIR
 
 BASE_RESOURCE_MAP = OrderedDict([
     (SU_FILE, {
         'services': [],
+        'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
+    }),
+    (PLUMGRID_CONF, {
+        'services': ['neutron-server'],
         'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
     }),
     (PGLIB_CONF, {

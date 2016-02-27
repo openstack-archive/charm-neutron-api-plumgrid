@@ -12,6 +12,7 @@ from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
     log,
+    relation_set
 )
 
 from charmhelpers.core.host import (
@@ -30,6 +31,10 @@ from neutron_plumgrid_utils import (
     register_configs,
     restart_map,
     ensure_files,
+)
+
+from charmhelpers.contrib.openstack.utils import (
+    os_release,
 )
 
 hooks = Hooks()
@@ -76,6 +81,23 @@ def relation_changed():
     '''
     ensure_files()
     CONFIGS.write_all()
+
+
+@hooks.hook("neutron-plugin-api-subordinate-relation-joined")
+def neutron_plugin_joined():
+    # create plugin config
+    release = os_release('neutron-server', base='kilo')
+    print "#############"
+    print release
+    plugin = "neutron.plugins.plumgrid.plumgrid_plugin.plumgrid_plugin.NeutronPluginPLUMgridV2" \
+             if  release == 'kilo'\
+             else "networking_plumgrid.neutron.plugins.plugin.NeutronPluginPLUMgridV2"
+    settings = { "neutron-plugin": "plumgrid",
+                 "core-plugin": plugin,
+                 "neutron-plugin-config": "/etc/neutron/plugins/plumgrid/plumgrid.ini",
+                 "service-plugins": " ",
+                 "quota-driver": " "}
+    relation_set(relation_settings=settings)
 
 
 @hooks.hook('stop')

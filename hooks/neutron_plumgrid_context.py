@@ -117,12 +117,12 @@ class NeutronPGPluginContext(context.NeutronContext):
         else:
             pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
 
-        neutron_api_settings = _container_settings()
-        pg_ctxt['admin_user'] = neutron_api_settings['service_username']
-        pg_ctxt['admin_password'] = neutron_api_settings['service_password']
-        pg_ctxt['admin_tenant_name'] = neutron_api_settings['service_tenant']
-        pg_ctxt['service_protocol'] = neutron_api_settings['auth_protocol']
-        pg_ctxt['auth_port'] = neutron_api_settings['auth_port']
-        pg_ctxt['auth_host'] = neutron_api_settings['auth_host']
+        #neutron_api_settings = _container_settings()
+        #pg_ctxt['admin_user'] = neutron_api_settings['service_username']
+        #pg_ctxt['admin_password'] = neutron_api_settings['service_password']
+        #pg_ctxt['admin_tenant_name'] = neutron_api_settings['service_tenant']
+        #pg_ctxt['service_protocol'] = neutron_api_settings['auth_protocol']
+        #pg_ctxt['auth_port'] = neutron_api_settings['auth_port']
+        #pg_ctxt['auth_host'] = neutron_api_settings['auth_host']
 
         return pg_ctxt
