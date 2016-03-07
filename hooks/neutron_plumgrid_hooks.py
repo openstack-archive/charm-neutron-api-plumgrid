@@ -11,8 +11,8 @@ from charmhelpers.contrib.python.packages import pip_uninstall
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
-    log,
-    relation_set
+    log,\
+    relation_get
 )
 
 from charmhelpers.core.host import (
@@ -31,10 +31,7 @@ from neutron_plumgrid_utils import (
     register_configs,
     restart_map,
     ensure_files,
-)
-
-from charmhelpers.contrib.openstack.utils import (
-    os_release,
+    set_neutron_relation,
 )
 
 hooks = Hooks()
@@ -85,19 +82,22 @@ def relation_changed():
 
 @hooks.hook("neutron-plugin-api-subordinate-relation-joined")
 def neutron_plugin_joined():
-    # create plugin config
-    release = os_release('neutron-server', base='kilo')
-    print "#############"
-    print release
-    plugin = "neutron.plugins.plumgrid.plumgrid_plugin.plumgrid_plugin.NeutronPluginPLUMgridV2" \
-             if  release == 'kilo'\
-             else "networking_plumgrid.neutron.plugins.plugin.NeutronPluginPLUMgridV2"
-    settings = { "neutron-plugin": "plumgrid",
-                 "core-plugin": plugin,
-                 "neutron-plugin-config": "/etc/neutron/plugins/plumgrid/plumgrid.ini",
-                 "service-plugins": " ",
-                 "quota-driver": " "}
-    relation_set(relation_settings=settings)
+    set_neutron_relation()
+
+
+@hooks.hook("identity-admin-relation-changed")
+def identity_admin_changed():
+    if not relation_get("service_hostname"):
+        log("Relation not ready")
+        return
+    identity_admin_relation()
+
+
+@hooks.hook("identity-admin-relation-departed")
+@hooks.hook("identity-admin-relation-broken")
+@restart_on_change(restart_map())
+def identity_admin_relation():
+    CONFIGS.write_all()
 
 
 @hooks.hook('stop')
@@ -105,10 +105,11 @@ def stop():
     '''
     This hook is run when the charm is destroyed.
     '''
-    pkgs = determine_packages()
-    for pkg in pkgs:
-        apt_purge(pkg, fatal=False)
-    pip_uninstall('networking-plumgrid')
+    print "exiting"
+    #pkgs = determine_packages()
+    #for pkg in pkgs:
+    #    apt_purge(pkg, fatal=False)
+    #pip_uninstall('networking-plumgrid')
 
 
 def main():

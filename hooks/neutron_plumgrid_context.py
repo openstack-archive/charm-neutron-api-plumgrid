@@ -10,7 +10,7 @@ from charmhelpers.core.hookenv import (
     relation_get,
 )
 from charmhelpers.contrib.openstack import context
-
+from socket import gethostbyname
 
 def _edge_settings():
     '''
@@ -28,39 +28,19 @@ def _edge_settings():
     return ctxt
 
 
-def _container_settings():
-    '''
-    Inspects current container relation to get keystone context.
-    '''
-    container_settings = {
-        'auth_host': '10.0.0.1',
-        'auth_port': '35357',
-        'auth_protocol': 'http',
-        'service_protocol': 'http',
-        'service_host': '10.0.0.1',
-        'service_port': '35357',
-        'service_tenant': 'admin',
-        'service_username': 'admin',
-        'service_password': 'admin',
-    }
-    for rid in relation_ids('container'):
-        for unit in related_units(rid):
-            rdata = relation_get(rid=rid, unit=unit)
-            if 'auth_host' not in rdata:
-                continue
-            container_settings = {
-                'auth_host': rdata['auth_host'],
-                'auth_port': rdata['auth_port'],
-                'auth_protocol': rdata['auth_protocol'],
-                'service_protocol': rdata['service_protocol'],
-                'service_host': rdata['service_host'],
-                'service_port': rdata['service_port'],
-                'service_tenant': rdata['service_tenant'],
-                'service_username': rdata['service_username'],
-                'service_password': rdata['service_password'],
-            }
-            return container_settings
-    return container_settings
+def _identity_context():
+    ctxs = [ { "auth_host": gethostbyname(hostname),
+               "auth_port": relation_get("service_port", unit, rid),
+               "admin_user": relation_get("service_username", unit, rid),
+               "admin_password": relation_get("service_password", unit, rid),
+               "service_protocol": relation_get("service_protocol", unit, rid),
+               "admin_tenant_name": relation_get("service_tenant_name", unit, rid) }
+             for rid in relation_ids("identity-admin")
+             for unit, hostname in
+             ((unit, relation_get("service_hostname", unit, rid)) for unit in related_units(rid))
+             if hostname ]
+    print ctxs
+    return ctxs[0] if ctxs else {}
 
 
 class NeutronPGPluginContext(context.NeutronContext):
@@ -106,6 +86,10 @@ class NeutronPGPluginContext(context.NeutronContext):
 
         conf = config()
         enable_metadata = conf['enable-metadata']
+        # (TODO) get this information from director
+        pg_ctxt['pg_username'] = conf['plumgrid-username']
+        pg_ctxt['pg_password'] = conf['plumgrid-password']
+        pg_ctxt['virtual_ip'] = conf['plumgrid-virtual-ip']
         pg_ctxt['enable_metadata'] = enable_metadata
         pg_ctxt['pg_metadata_ip'] = '169.254.169.254'
         pg_ctxt['pg_metadata_port'] = '8775'
@@ -117,12 +101,12 @@ class NeutronPGPluginContext(context.NeutronContext):
         else:
             pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
 
-        #neutron_api_settings = _container_settings()
-        #pg_ctxt['admin_user'] = neutron_api_settings['service_username']
-        #pg_ctxt['admin_password'] = neutron_api_settings['service_password']
-        #pg_ctxt['admin_tenant_name'] = neutron_api_settings['service_tenant']
-        #pg_ctxt['service_protocol'] = neutron_api_settings['auth_protocol']
-        #pg_ctxt['auth_port'] = neutron_api_settings['auth_port']
-        #pg_ctxt['auth_host'] = neutron_api_settings['auth_host']
+        identity_context = _identity_context()
+        pg_ctxt['admin_user'] = identity_context['admin_user']
+        pg_ctxt['admin_password'] = identity_context['admin_password']
+        pg_ctxt['admin_tenant_name'] = identity_context['admin_tenant_name']
+        pg_ctxt['service_protocol'] = identity_context['service_protocol']
+        pg_ctxt['auth_port'] = identity_context['auth_port']
+        pg_ctxt['auth_host'] = identity_context['auth_host']
 
         return pg_ctxt

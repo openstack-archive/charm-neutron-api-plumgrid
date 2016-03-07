@@ -6,7 +6,9 @@
 from collections import OrderedDict
 from copy import deepcopy
 import os
+from subprocess import check_call
 from charmhelpers.contrib.openstack import templating
+from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.python.packages import pip_install
 from charmhelpers.fetch import (
     apt_cache
@@ -17,6 +19,9 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.contrib.openstack.utils import (
     os_release,
 )
+from charmhelpers.core.hookenv import (
+    relation_set,
+)
 
 import neutron_plumgrid_context
 
@@ -24,7 +29,7 @@ TEMPLATES = 'templates/'
 
 PG_PACKAGES = [
     'plumgrid-pythonlib',
-    'neutron-plugin-plumgrid'
+    #'neutron-plugin-plumgrid'
 ]
 
 NEUTRON_CONF_DIR = "/etc/neutron"
@@ -72,7 +77,12 @@ def determine_packages():
                     "Build version '%s' for package '%s' not available" \
                     % (tag, pkg)
                 raise ValueError(error_msg)
-    # return list(set(PG_PACKAGES))
+    # if subordinate
+    #pkgs.append('neutron-plugin-plumgrid')
+    cmd = ['mkdir', '-p', '/etc/neutron/plugins/plumgrid']
+    check_call(cmd)
+    cmd = ['touch', '/etc/neutron/plugins/plumgrid/plumgrid.ini']
+    check_call(cmd)
     return pkgs
 
 
@@ -90,7 +100,7 @@ def register_configs(release=None):
     Returns an object of the Openstack Tempating Class which contains the
     the context required for all templates of this charm.
     '''
-    release = release or os_release('neutron-server', base='kilo')
+    release = release or os_release('neutron-common', base='kilo')
     if release < 'kilo':
         raise ValueError('OpenStack %s release not supported' % release)
 
@@ -123,10 +133,25 @@ def install_networking_plumgrid():
     '''
     Installs networking-plumgrid package
     '''
-    release = os_release('neutron-server', base='kilo')
+    release = os_release('neutron-common', base='kilo')
     if config('networking-plumgrid-version') is None:
         package_version = NETWORKING_PLUMGRID_VERSION[release]
     else:
         package_version = config('networking-plumgrid-version')
     package_name = 'networking-plumgrid==%s' % package_version
     pip_install(package_name, fatal=True)
+
+
+def set_neutron_relation():
+    #release = os_release('neutron-common', base='kilo')
+    #plugin = "neutron.plugins.plumgrid.plumgrid_plugin.plumgrid_plugin.NeutronPluginPLUMgridV2" \
+    #         if  release == 'kilo'\
+    #         else "networking_plumgrid.neutron.plugins.plugin.NeutronPluginPLUMgridV2"
+    print "#### core-plugin: %s" % neutron_plugin_attribute('plumgrid','driver','neutron')
+    print "#### neutron-plugin-config %s" %  neutron_plugin_attribute('plumgrid','config','neutron')
+    settings = { "neutron-plugin": "plumgrid",
+                 "core-plugin": neutron_plugin_attribute('plumgrid','driver','neutron'),
+                 "neutron-plugin-config": neutron_plugin_attribute('plumgrid','config','neutron'),
+                 "service-plugins": " ",
+                 "quota-driver": " "}
+    relation_set(relation_settings=settings)
