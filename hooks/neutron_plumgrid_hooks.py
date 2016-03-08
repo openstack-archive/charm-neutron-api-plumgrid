@@ -86,13 +86,6 @@ def neutron_plugin_joined():
 
 
 @hooks.hook("identity-admin-relation-changed")
-def identity_admin_changed():
-    if not relation_get("service_hostname"):
-        log("Relation not ready")
-        return
-    identity_admin_relation()
-
-
 @hooks.hook("identity-admin-relation-departed")
 @hooks.hook("identity-admin-relation-broken")
 @restart_on_change(restart_map())
