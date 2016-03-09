@@ -153,5 +153,5 @@ def set_neutron_relation():
                  "core-plugin": neutron_plugin_attribute('plumgrid','driver','neutron'),
                  "neutron-plugin-config": neutron_plugin_attribute('plumgrid','config','neutron'),
                  "service-plugins": " ",
-                 "quota-driver": " "}
+                 "quota-driver": "neutron.db.quota_db.DbQuotaDriver"}
     relation_set(relation_settings=settings)
