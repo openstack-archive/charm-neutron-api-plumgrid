@@ -19,13 +19,11 @@ utils.restart_map = _map
 TO_PATCH = [
     'configure_sources',
     'apt_update',
-    'apt_purge',
     'apt_install',
     'CONFIGS',
     'ensure_files',
     'stop',
     'determine_packages',
-    'pip_uninstall',
 ]
 NEUTRON_CONF_DIR = "/etc/neutron"
 
@@ -77,12 +75,3 @@ class NeutronPGHooksTests(CharmTestCase):
         self._call_hook('container-relation-changed')
         self.ensure_files.assert_called_with()
         self.CONFIGS.write_all.assert_called_with()
-
-    def test_stop(self):
-        _pkgs = ['plumgrid-pythonlib']
-        self.determine_packages.return_value = [_pkgs]
-        self._call_hook('stop')
-        self.apt_purge.assert_has_calls([
-            call(_pkgs, fatal=False)
-        ])
-        self.pip_uninstall.assert_called_with('networking-plumgrid')

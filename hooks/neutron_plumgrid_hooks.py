@@ -6,7 +6,6 @@
 # in this file.
 
 import sys
-from charmhelpers.contrib.python.packages import pip_uninstall
 
 from charmhelpers.core.hookenv import (
     Hooks,
@@ -22,7 +21,6 @@ from charmhelpers.fetch import (
     apt_install,
     apt_update,
     configure_sources,
-    apt_purge,
 )
 
 from neutron_plumgrid_utils import (
@@ -83,10 +81,7 @@ def stop():
     '''
     This hook is run when the charm is destroyed.
     '''
-    pkgs = determine_packages()
-    for pkg in pkgs:
-        apt_purge(pkg, fatal=False)
-    pip_uninstall('networking-plumgrid')
+    log('Charm stopping without removal of packages')
 
 
 def main():
