@@ -52,20 +52,6 @@ class NeutronPGHooksTests(CharmTestCase):
         ])
         self.ensure_files.assert_called_with()
 
-    def test_config_changed_hook(self):
-        _pkgs = ['plumgrid-pythonlib']
-        self.determine_packages.return_value = [_pkgs]
-        self._call_hook('config-changed')
-        self.stop.assert_called_with()
-        self.configure_sources.assert_called_with()
-        self.apt_update.assert_called_with()
-        self.apt_install.assert_has_calls([
-            call(_pkgs, fatal=True,
-                 options=['--force-yes']),
-        ])
-        self.ensure_files.assert_called_with()
-        self.CONFIGS.write_all.assert_called_with()
-
     def test_neutron_api_joined(self):
         self._call_hook('neutron-plugin-api-relation-joined')
         self.ensure_files.assert_called_with()

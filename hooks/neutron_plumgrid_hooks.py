@@ -11,10 +11,12 @@ from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
     log,
+    config,
 )
 
 from charmhelpers.core.host import (
     restart_on_change,
+    service_restart
 )
 
 from charmhelpers.fetch import (
@@ -48,18 +50,25 @@ def install():
 
 
 @hooks.hook('config-changed')
+@restart_on_change(restart_map())
 def config_changed():
     '''
     This hook is run when a config parameter is changed.
     It also runs on node reboot.
     '''
-    stop()
-    configure_sources()
-    apt_update()
-    pkgs = determine_packages()
-    for pkg in pkgs:
-        apt_install(pkg, options=['--force-yes'], fatal=True)
-    ensure_files()
+    charm_config = config()
+    if (charm_config.changed('install_sources') or
+        charm_config.changed('plumgrid-build') or
+            charm_config.changed('install_keys')):
+        configure_sources()
+        apt_update()
+        pkgs = determine_packages()
+        for pkg in pkgs:
+            apt_install(pkg, options=['--force-yes'], fatal=True)
+        service_restart('neutron-server')
+    if charm_config.changed('networking-plumgrid-version'):
+        ensure_files()
+        service_restart('neutron-server')
     CONFIGS.write_all()
 
 
