@@ -17,7 +17,7 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.contrib.openstack.utils import (
     os_release,
 )
-
+import subprocess
 import neutron_plumgrid_context
 
 TEMPLATES = 'templates/'
@@ -124,3 +124,12 @@ def install_networking_plumgrid():
         package_version = config('networking-plumgrid-version')
     package_name = 'networking-plumgrid==%s' % package_version
     pip_install(package_name, fatal=True)
+
+
+def migrate_neutron_db():
+    release = os_release('neutron-common', base='kilo')
+    if release == 'liberty':
+        cmd = ['neutron-db-manage', 'upgrade', 'head']
+    elif release == 'kilo':
+        cmd = ['plumgrid-db-manage', 'upgrade', 'head']
+    subprocess.check_output(cmd)

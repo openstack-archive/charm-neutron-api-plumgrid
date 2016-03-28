@@ -30,6 +30,7 @@ from neutron_plumgrid_utils import (
     register_configs,
     restart_map,
     ensure_files,
+    migrate_neutron_db,
 )
 
 hooks = Hooks()
@@ -47,6 +48,7 @@ def install():
     for pkg in pkgs:
         apt_install(pkg, options=['--force-yes'], fatal=True)
     ensure_files()
+    migrate_neutron_db()
 
 
 @hooks.hook('config-changed')
