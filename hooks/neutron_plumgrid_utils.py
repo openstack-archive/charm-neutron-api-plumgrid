@@ -124,12 +124,11 @@ def install_networking_plumgrid():
         package_version = config('networking-plumgrid-version')
     package_name = 'networking-plumgrid==%s' % package_version
     pip_install(package_name, fatal=True)
+    migrate_neutron_db()
 
 
 def migrate_neutron_db():
     release = os_release('neutron-common', base='kilo')
-    if release == 'liberty':
-        cmd = ['neutron-db-manage', 'upgrade', 'head']
-    elif release == 'kilo':
-        cmd = ['plumgrid-db-manage', 'upgrade', 'head']
+    cmd = [('plumgrid-db-manage' if release == 'kilo' else
+          'neutron-db-manage'), 'upgrade', 'head']
     subprocess.check_output(cmd)
