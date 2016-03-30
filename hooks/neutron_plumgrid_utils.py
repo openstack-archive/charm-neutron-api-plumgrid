@@ -124,7 +124,7 @@ def install_networking_plumgrid():
         package_version = config('networking-plumgrid-version')
     package_name = 'networking-plumgrid==%s' % package_version
     pip_install(package_name, fatal=True)
-    if package_version is not '2015.1.1.1':
+    if package_version != '2015.1.1.1':
         migrate_neutron_db()
 
 
