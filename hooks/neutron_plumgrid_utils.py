@@ -131,5 +131,5 @@ def install_networking_plumgrid():
 def migrate_neutron_db():
     release = os_release('neutron-common', base='kilo')
     cmd = [('plumgrid-db-manage' if release == 'kilo' 
-          else 'neutron-db-manage'),'upgrade', 'head']
+          else 'neutron-db-manage'),'upgrade', 'heads']
     subprocess.check_output(cmd)
