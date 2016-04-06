@@ -13,7 +13,7 @@ from charmhelpers.fetch import (
 )
 from charmhelpers.core.hookenv import (
     config,
-    is_leader,
+    is_leader
 )
 from charmhelpers.contrib.openstack.utils import (
     os_release,
