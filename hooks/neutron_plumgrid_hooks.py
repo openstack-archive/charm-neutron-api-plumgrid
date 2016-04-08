@@ -6,12 +6,13 @@
 # in this file.
 
 import sys
-
+from charmhelpers.core.host import service_running
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
     log,
     config,
+    status_set
 )
 
 from charmhelpers.core.host import (
@@ -41,7 +42,9 @@ def install():
     '''
     Install hook is run when the charm is first deployed on a node.
     '''
+    status_set('maintenance', 'Executing pre-install')
     configure_sources()
+    status_set('maintenance', 'Installing apt packages')
     apt_update()
     pkgs = determine_packages()
     for pkg in pkgs:
@@ -60,6 +63,7 @@ def config_changed():
     if (charm_config.changed('install_sources') or
         charm_config.changed('plumgrid-build') or
             charm_config.changed('install_keys')):
+        status_set('maintenance', 'Upgrading apt packages')
         configure_sources()
         apt_update()
         pkgs = determine_packages()
@@ -91,6 +95,14 @@ def stop():
     This hook is run when the charm is destroyed.
     '''
     log('Charm stopping without removal of packages')
+
+
+@hooks.hook('update-status')
+def update_status():
+    if service_running('neutron-server'):
+        status_set('active', 'Unit is ready')
+    else:
+        status_set('blocked', 'neutron server not running')
 
 
 def main():
