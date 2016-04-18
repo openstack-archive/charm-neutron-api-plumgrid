@@ -31,6 +31,7 @@ from neutron_plumgrid_utils import (
     register_configs,
     restart_map,
     ensure_files,
+    set_neutron_relation,
 )
 
 hooks = Hooks()
@@ -86,6 +87,19 @@ def relation_changed():
     neutron-api or plumgrid-edge is made.
     '''
     ensure_files()
+    CONFIGS.write_all()
+
+
+@hooks.hook("neutron-plugin-api-subordinate-relation-joined")
+def neutron_plugin_joined():
+    set_neutron_relation()
+
+
+@hooks.hook("identity-admin-relation-changed")
+@hooks.hook("identity-admin-relation-departed")
+@hooks.hook("identity-admin-relation-broken")
+@restart_on_change(restart_map())
+def identity_admin_relation():
     CONFIGS.write_all()
 
 
