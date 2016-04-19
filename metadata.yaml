@@ -25,7 +25,7 @@ provides:
     interface: plumgrid-plugin
 requires:
   container:
-    interface: juju-info
+    interface: neutron-plugin-api
     scope: container
   identity-admin:
     interface: keystone-admin

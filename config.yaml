@@ -30,13 +30,13 @@ options:
     type: string
     description: Password to access PLUMgrid Director
   plumgrid-virtual-ip:
-    default:
+    default: 192.168.100.250
     type: string
     description: IP address of PLUMgrid Director
   # end of PLUMgrid configuration
   manage-neutron-plugin-legacy-mode:
     type: boolean
-    default: False
+    default: True
     description: |
       If True neutron-api charm will install neutron packages for the plugin
       configured. Also needs to be set in neutron-api charm

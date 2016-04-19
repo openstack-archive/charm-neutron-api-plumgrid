@@ -91,6 +91,9 @@ def resource_map():
     hook execution.
     '''
     resource_map = deepcopy(BASE_RESOURCE_MAP)
+    is_legacy_mode = config('manage-neutron-plugin-legacy-mode')
+    if is_legacy_mode:
+        del resource_map[PLUMGRID_CONF]
     return resource_map
 
 
