@@ -36,7 +36,7 @@ options:
   # end of PLUMgrid configuration
   manage-neutron-plugin-legacy-mode:
     type: boolean
-    default: True
+    default: false
     description: |
       If True neutron-api charm will install neutron packages for the plugin
       configured. Also needs to be set in neutron-api charm

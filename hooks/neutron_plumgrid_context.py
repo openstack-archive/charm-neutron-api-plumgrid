@@ -12,6 +12,7 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.contrib.openstack import context
 from socket import gethostbyname
 
+
 def _edge_settings():
     '''
     Inspects plumgrid-edge relation to get metadata shared secret.
