@@ -30,16 +30,17 @@ def _edge_settings():
 
 
 def _identity_context():
-    ctxs = [ { "auth_host": gethostbyname(hostname),
-               "auth_port": relation_get("service_port", unit, rid),
-               "admin_user": relation_get("service_username", unit, rid),
-               "admin_password": relation_get("service_password", unit, rid),
-               "service_protocol": relation_get("auth_protocol", unit, rid) or 'http',
-               "admin_tenant_name": relation_get("service_tenant_name", unit, rid) }
-             for rid in relation_ids("identity-admin")
-             for unit, hostname in
-             ((unit, relation_get("service_hostname", unit, rid)) for unit in related_units(rid))
-             if hostname ]
+    ctxs = [{
+        'auth_host': gethostbyname(hostname),
+        'auth_port': relation_get('service_port', unit, rid),
+        'admin_user': relation_get('service_username', unit, rid),
+        'admin_password': relation_get('service_password', unit, rid),
+        'service_protocol': relation_get('auth_protocol', unit, rid) or 'http',
+        'admin_tenant_name': relation_get('service_tenant_name', unit,
+                                          rid),
+    } for rid in relation_ids('identity-admin') for (unit, hostname) in
+        ((unit, relation_get('service_hostname', unit, rid))
+            for unit in related_units(rid)) if hostname]
     return ctxs[0] if ctxs else {}
 
 
@@ -104,7 +105,8 @@ class NeutronPGPluginContext(context.NeutronContext):
             identity_context = _identity_context()
             pg_ctxt['admin_user'] = identity_context['admin_user']
             pg_ctxt['admin_password'] = identity_context['admin_password']
-            pg_ctxt['admin_tenant_name'] = identity_context['admin_tenant_name']
+            pg_ctxt['admin_tenant_name'] = \
+                identity_context['admin_tenant_name']
             pg_ctxt['service_protocol'] = identity_context['service_protocol']
             pg_ctxt['auth_port'] = identity_context['auth_port']
             pg_ctxt['auth_host'] = identity_context['auth_host']

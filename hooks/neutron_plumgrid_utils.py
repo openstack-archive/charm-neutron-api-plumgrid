@@ -27,8 +27,7 @@ from charmhelpers.contrib.openstack.utils import (
 TEMPLATES = 'templates/'
 
 PG_PACKAGES = [
-    'plumgrid-pythonlib',
-    #'neutron-plugin-plumgrid'
+    'plumgrid-pythonlib'
 ]
 
 NEUTRON_CONF_DIR = "/etc/neutron"
@@ -76,8 +75,6 @@ def determine_packages():
                     "Build version '%s' for package '%s' not available" \
                     % (tag, pkg)
                 raise ValueError(error_msg)
-    # if subordinate
-    #pkgs.append('neutron-plugin-plumgrid')
     cmd = ['mkdir', '-p', '/etc/neutron/plugins/plumgrid']
     check_call(cmd)
     cmd = ['touch', '/etc/neutron/plugins/plumgrid/plumgrid.ini']
@@ -154,15 +151,14 @@ def migrate_neutron_db():
 
 
 def set_neutron_relation():
-    #release = os_release('neutron-common', base='kilo')
-    #plugin = "neutron.plugins.plumgrid.plumgrid_plugin.plumgrid_plugin.NeutronPluginPLUMgridV2" \
-    #         if  release == 'kilo'\
-    #         else "networking_plumgrid.neutron.plugins.plugin.NeutronPluginPLUMgridV2"
-    print "#### core-plugin: %s" % neutron_plugin_attribute('plumgrid','driver','neutron')
-    print "#### neutron-plugin-config %s" %  neutron_plugin_attribute('plumgrid','config','neutron')
-    settings = { "neutron-plugin": "plumgrid",
-                 "core-plugin": neutron_plugin_attribute('plumgrid','driver','neutron'),
-                 "neutron-plugin-config": neutron_plugin_attribute('plumgrid','config','neutron'),
-                 "service-plugins": " ",
-                 "quota-driver": "neutron.db.quota_db.DbQuotaDriver"}
+    settings = {
+        'neutron-plugin': 'plumgrid',
+        'core-plugin': neutron_plugin_attribute('plumgrid', 'driver',
+                                                'neutron'),
+        'neutron-plugin-config': neutron_plugin_attribute('plumgrid',
+                                                          'config', 'neutron'),
+        'service-plugins': ' ',
+        'quota-driver': 'neutron.db.quota_db.DbQuotaDriver',
+    }
+
     relation_set(relation_settings=settings)
