@@ -57,11 +57,11 @@ class NeutronPGContextTest(CharmTestCase):
                 return "neutron.randomconfig"
 
         config = {
-                  'enable-metadata': False,
-                  'plumgrid-username': 'plumgrid',
-                  'plumgrid-password': 'plumgrid',
-                  'plumgrid-virtual-ip': '192.168.100.250'
-                  }
+            'enable-metadata': False,
+            'plumgrid-username': 'plumgrid',
+            'plumgrid-password': 'plumgrid',
+            'plumgrid-virtual-ip': '192.168.100.250',
+        }
 
         def mock_config(key=None):
             if key:
@@ -95,12 +95,6 @@ class NeutronPGContextTest(CharmTestCase):
             'neutron_plugin': 'plumgrid',
             'neutron_security_groups': None,
             'neutron_url': 'https://None:9696',
-            #'admin_user': 'admin',
-            #'admin_password': 'admin',
-            #'admin_tenant_name': 'admin',
-            #'service_protocol': 'http',
-            #'auth_port': '35357',
-            #'auth_host': '10.0.0.1',
             'metadata_mode': 'tunnel',
             'nova_metadata_proxy_secret': 'plumgrid',
             'pg_metadata_ip': '169.254.169.254',
