@@ -96,7 +96,6 @@ def neutron_plugin_joined():
 
 
 @hooks.hook("identity-admin-relation-changed")
-@hooks.hook("identity-admin-relation-departed")
 @hooks.hook("identity-admin-relation-broken")
 @restart_on_change(restart_map())
 def identity_admin_relation():
