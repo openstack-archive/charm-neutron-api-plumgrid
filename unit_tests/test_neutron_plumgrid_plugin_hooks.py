@@ -24,6 +24,7 @@ TO_PATCH = [
     'ensure_files',
     'stop',
     'determine_packages',
+    'status_set'
 ]
 NEUTRON_CONF_DIR = "/etc/neutron"
 
