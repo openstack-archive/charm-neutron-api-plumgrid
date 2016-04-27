@@ -101,8 +101,8 @@ class NeutronPGPluginContext(context.NeutronContext):
                 plumgrid_edge_settings['metadata_shared_secret']
         else:
             pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
-        if relation_get("service_hostname"):
-            identity_context = _identity_context()
+        identity_context = _identity_context()
+        if identity_context:
             pg_ctxt['admin_user'] = identity_context['admin_user']
             pg_ctxt['admin_password'] = identity_context['admin_password']
             pg_ctxt['admin_tenant_name'] = \
