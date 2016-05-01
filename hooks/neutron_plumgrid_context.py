@@ -91,8 +91,12 @@ class NeutronPGPluginContext(context.NeutronContext):
         pg_ctxt['pg_username'] = conf['plumgrid-username']
         pg_ctxt['pg_password'] = conf['plumgrid-password']
         pg_ctxt['virtual_ip'] = conf['plumgrid-virtual-ip']
+        pg_ctxt['hardware_vendor_name'] = config('hardware-vendor-name')
+        pg_ctxt['switch_username'] = config('switch-username')
+        pg_ctxt['switch_password'] = config('switch-password')
         pg_ctxt['enable_metadata'] = enable_metadata
         pg_ctxt['pg_metadata_ip'] = '169.254.169.254'
+        pg_ctxt['pg_metadata_subnet'] = '169.254.169.254/30'
         pg_ctxt['pg_metadata_port'] = '8775'
         pg_ctxt['metadata_mode'] = 'tunnel'
         if enable_metadata:

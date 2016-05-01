@@ -61,6 +61,9 @@ class NeutronPGContextTest(CharmTestCase):
             'plumgrid-username': 'plumgrid',
             'plumgrid-password': 'plumgrid',
             'plumgrid-virtual-ip': '192.168.100.250',
+            'hardware-vendor-name': 'vendor_name',
+            'switch-username': 'plumgrid',
+            'switch-password': 'plumgrid',
         }
 
         def mock_config(key=None):
@@ -88,9 +91,13 @@ class NeutronPGContextTest(CharmTestCase):
             'neutron_plugin': 'plumgrid',
             'neutron_security_groups': None,
             'neutron_url': 'https://None:9696',
+            'hardware_vendor_name': 'vendor_name',
+            'switch_username': 'plumgrid',
+            'switch_password': 'plumgrid',
             'metadata_mode': 'tunnel',
             'nova_metadata_proxy_secret': 'plumgrid',
             'pg_metadata_ip': '169.254.169.254',
+            'pg_metadata_subnet': '169.254.169.254/30',
             'pg_metadata_port': '8775',
         }
         self.assertEquals(expect, napi_ctxt())

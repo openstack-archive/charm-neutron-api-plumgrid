@@ -16,6 +16,7 @@ from charmhelpers.fetch import (
     apt_cache
 )
 from charmhelpers.core.hookenv import (
+    log,
     config,
     is_leader,
     relation_set
@@ -35,6 +36,7 @@ NEUTRON_CONF_DIR = "/etc/neutron"
 SU_FILE = '/etc/sudoers.d/neutron_sudoers'
 PLUMGRID_CONF = '%s/plugins/plumgrid/plumgrid.ini' % NEUTRON_CONF_DIR
 PGLIB_CONF = '%s/plugins/plumgrid/plumlib.ini' % NEUTRON_CONF_DIR
+PGRC = '%s/plugins/plumgrid/pgrc' % NEUTRON_CONF_DIR
 
 BASE_RESOURCE_MAP = OrderedDict([
     (SU_FILE, {
@@ -46,6 +48,10 @@ BASE_RESOURCE_MAP = OrderedDict([
         'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
     }),
     (PGLIB_CONF, {
+        'services': ['neutron-server'],
+        'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
+    }),
+    (PGRC, {
         'services': ['neutron-server'],
         'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
     }),
@@ -128,6 +134,22 @@ def ensure_files():
     os.chmod('/etc/sudoers.d/neutron_sudoers', 0o440)
 
 
+def _exec_cmd(cmd=None, error_msg='Command exited with ERRORs', fatal=False):
+    '''
+    Function to execute any bash command on the node.
+    '''
+    if cmd is None:
+        log("No command specified")
+    else:
+        if fatal:
+            subprocess.check_call(cmd)
+        else:
+            try:
+                subprocess.check_call(cmd)
+            except subprocess.CalledProcessError:
+                log(error_msg)
+
+
 def install_networking_plumgrid():
     '''
     Installs networking-plumgrid package
@@ -145,9 +167,10 @@ def install_networking_plumgrid():
 
 def migrate_neutron_db():
     release = os_release('neutron-common', base='kilo')
-    cmd = [('plumgrid-db-manage' if release == 'kilo'
-            else 'neutron-db-manage'), 'upgrade', 'heads']
-    subprocess.check_output(cmd)
+    neutron_db_cmd = [('plumgrid-db-manage' if release == 'kilo'
+                       else 'neutron-db-manage'), 'upgrade', 'heads']
+    _exec_cmd(cmd=neutron_db_cmd,
+              error_msg="neutron-db-manage executed with errors", fatal=False)
 
 
 def set_neutron_relation():

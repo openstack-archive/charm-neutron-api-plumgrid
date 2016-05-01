@@ -33,7 +33,18 @@ options:
     default: 192.168.100.250
     type: string
     description: IP address of PLUMgrid Director
-  # end of PLUMgrid configuration
+  hardware-vendor-name:
+    type: string
+    default: vendor_name
+    description: Name of the supported hardware vendor
+  switch-username:
+    type: string
+    default: plumgrid
+    description: Username of the L2 gateway
+  switch-password:
+    type: string
+    default: plumgrid
+    description: Password of the L2 gateway
   manage-neutron-plugin-legacy-mode:
     type: boolean
     default: false

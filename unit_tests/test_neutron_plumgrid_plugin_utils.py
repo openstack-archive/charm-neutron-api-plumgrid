@@ -50,7 +50,8 @@ class TestNeutronPGUtils(CharmTestCase):
         templating.OSConfigRenderer.side_effect = _mock_OSConfigRenderer
         _regconfs = nutils.register_configs()
         confs = ['/etc/sudoers.d/neutron_sudoers',
-                 '/etc/neutron/plugins/plumgrid/plumlib.ini']
+                 '/etc/neutron/plugins/plumgrid/plumlib.ini',
+                 '/etc/neutron/plugins/plumgrid/pgrc']
         self.assertItemsEqual(_regconfs.configs, confs)
 
     def test_resource_map(self):
@@ -64,6 +65,7 @@ class TestNeutronPGUtils(CharmTestCase):
         _restart_map = nutils.restart_map()
         expect = OrderedDict([
             (nutils.PGLIB_CONF, ['neutron-server']),
+            (nutils.PGRC, ['neutron-server']),
         ])
         self.assertEqual(expect, _restart_map)
         for item in _restart_map:
