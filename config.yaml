@@ -47,7 +47,7 @@ options:
     description: Password of the L2 gateway
   manage-neutron-plugin-legacy-mode:
     type: boolean
-    default: false
+    default: True
     description: |
       If True neutron-api charm will install neutron packages for the plugin
       configured. Also needs to be set in neutron-api charm
