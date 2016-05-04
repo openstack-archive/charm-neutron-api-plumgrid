@@ -27,8 +27,6 @@ requires:
   container:
     interface: neutron-plugin-api
     scope: container
-  plumgrid:
-    interface: plumgrid
   identity-admin:
     interface: keystone-admin
   plumgrid-configs:

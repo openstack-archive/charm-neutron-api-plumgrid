@@ -1,7 +1,7 @@
 options:
   enable-metadata:
     type: boolean
-    default: False
+    default: True
     description: "Set as True to enable metadata support"
   install_sources:
     default: 'ppa:plumgrid-team/stable'

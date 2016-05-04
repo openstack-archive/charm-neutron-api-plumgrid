@@ -27,7 +27,8 @@ class NeutronPGContextTest(CharmTestCase):
 
     def tearDown(self):
         super(NeutronPGContextTest, self).tearDown()
-    @patch.object(context, '_plumgrid_configs')
+
+    @patch.object(context, '_plumgrid_context')
     @patch.object(context, '_identity_context')
     @patch.object(charmhelpers.contrib.openstack.context, 'config',
                   lambda *args: None)
@@ -46,7 +47,7 @@ class NeutronPGContextTest(CharmTestCase):
     def test_neutroncc_context_api_rel(self, _unit_priv_ip, _npa, _ens_pkgs,
                                        _save_ff, _https, _is_clus, _unit_get,
                                        _config, _runits, _rids, _rget,
-                                       _iden_context, _plum_configs):
+                                       _iden_context, _plum_context):
         def mock_npa(plugin, section, manager):
             if section == "driver":
                 return "neutron.randomdriver"
@@ -55,9 +56,6 @@ class NeutronPGContextTest(CharmTestCase):
 
         config = {
             'enable-metadata': False,
-            #'plumgrid-username': 'plumgrid',
-            #'plumgrid-password': 'plumgrid',
-            #'plumgrid-virtual-ip': '192.168.100.250',
             'hardware-vendor-name': 'vendor_name',
             'switch-username': 'plumgrid',
             'switch-password': 'plumgrid',
@@ -73,7 +71,7 @@ class NeutronPGContextTest(CharmTestCase):
         self.config.side_effect = mock_config
         _npa.side_effect = mock_npa
         _iden_context.return_value = None
-        _plum_configs.return_value = None
+        _plum_context.return_value = None
         _unit_get.return_value = '192.168.100.201'
         _unit_priv_ip.return_value = '192.168.100.201'
         napi_ctxt = context.NeutronPGPluginContext()

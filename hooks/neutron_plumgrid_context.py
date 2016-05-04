@@ -13,9 +13,9 @@ from charmhelpers.contrib.openstack import context
 from socket import gethostbyname
 
 
-def _edge_settings():
+def _edge_context():
     '''
-    Inspects plumgrid-edge relation to get metadata shared secret.
+    Inspects plumgrid-plugin relation to get metadata shared secret.
     '''
     ctxt = {
         'metadata_shared_secret': 'plumgrid',
@@ -29,9 +29,10 @@ def _edge_settings():
     return ctxt
 
 
-def _plumgrid_configs():
+def _plumgrid_context():
     '''
-    Inspects plumgrid-director relation to get plumgrid virtup ip, username and password.
+    Inspects plumgrid-configs relation to get plumgrid virtual ip,
+    username and password.
     '''
     ctxt = {}
     for rid in relation_ids('plumgrid-configs'):
@@ -49,7 +50,7 @@ def _plumgrid_configs():
 
 def _identity_context():
     '''
-    Inspects keystone relation to get keystone credentials.
+    Inspects identity-admin relation to get keystone credentials.
     '''
     ctxs = [{
         'auth_host': gethostbyname(hostname),
@@ -117,9 +118,9 @@ class NeutronPGPluginContext(context.NeutronContext):
         pg_ctxt['pg_metadata_port'] = '8775'
         pg_ctxt['metadata_mode'] = 'tunnel'
         if enable_metadata:
-            plumgrid_edge_settings = _edge_settings()
+            plumgrid_edge_ctxt = _edge_context()
             pg_ctxt['nova_metadata_proxy_secret'] = \
-                plumgrid_edge_settings['metadata_shared_secret']
+                plumgrid_edge_ctxt['metadata_shared_secret']
         else:
             pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
         identity_context = _identity_context()
@@ -131,10 +132,10 @@ class NeutronPGPluginContext(context.NeutronContext):
             pg_ctxt['service_protocol'] = identity_context['service_protocol']
             pg_ctxt['auth_port'] = identity_context['auth_port']
             pg_ctxt['auth_host'] = identity_context['auth_host']
-        plumgrid_configs = _plumgrid_configs()
-        if plumgrid_configs:
-            pg_ctxt['pg_username'] = plumgrid_configs['plumgrid_username']
-            pg_ctxt['pg_password'] = plumgrid_configs['plumgrid_password']
-            pg_ctxt['virtual_ip'] = plumgrid_configs['plumgrid_virtual_ip']
+        plumgrid_context = _plumgrid_context()
+        if plumgrid_context:
+            pg_ctxt['pg_username'] = plumgrid_context['plumgrid_username']
+            pg_ctxt['pg_password'] = plumgrid_context['plumgrid_password']
+            pg_ctxt['virtual_ip'] = plumgrid_context['plumgrid_virtual_ip']
             print pg_ctxt
         return pg_ctxt

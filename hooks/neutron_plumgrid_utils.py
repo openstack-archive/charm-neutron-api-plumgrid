@@ -167,10 +167,10 @@ def install_networking_plumgrid():
 
 def migrate_neutron_db():
     release = os_release('neutron-common', base='kilo')
-    neutron_db_cmd = [('plumgrid-db-manage' if release == 'kilo'
-                       else 'neutron-db-manage'), 'upgrade', 'heads']
-    _exec_cmd(cmd=neutron_db_cmd,
-              error_msg="neutron-db-manage executed with errors", fatal=False)
+    _exec_cmd(cmd=[('plumgrid-db-manage' if release == 'kilo'
+                    else 'neutron-db-manage'), 'upgrade', 'heads'],
+              error_msg="neutron-db-manage executed with errors",
+              fatal=False)
 
 
 def set_neutron_relation():
