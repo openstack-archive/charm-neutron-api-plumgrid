@@ -6,7 +6,7 @@ include:
     - contrib.amulet
     - contrib.hahelpers
     - contrib.network
-    - contrib.openstack|inc=*
+    - contrib.openstack
     - contrib.python
     - contrib.storage
     - payload
