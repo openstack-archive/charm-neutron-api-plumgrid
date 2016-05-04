@@ -95,6 +95,13 @@ def neutron_plugin_joined():
     set_neutron_relation()
 
 
+@hooks.hook("plumgrid-configs-relation-changed")
+@hooks.hook("plumgrid-configs-relation-broken")
+@restart_on_change(restart_map())
+def plumgrid_configs_relation():
+    CONFIGS.write_all()
+
+
 @hooks.hook("identity-admin-relation-changed")
 @hooks.hook("identity-admin-relation-broken")
 @restart_on_change(restart_map())

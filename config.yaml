@@ -21,18 +21,6 @@ options:
     type: string
     description: |
        Provide the version of networking-plumgrid package that needs to be installed
-  plumgrid-username:
-    default: plumgrid
-    type: string
-    description: Username to access PLUMgrid Director
-  plumgrid-password:
-    default: plumgrid
-    type: string
-    description: Password to access PLUMgrid Director
-  plumgrid-virtual-ip:
-    default: 192.168.100.250
-    type: string
-    description: IP address of PLUMgrid Director
   hardware-vendor-name:
     type: string
     default: vendor_name

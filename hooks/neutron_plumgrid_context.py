@@ -29,7 +29,28 @@ def _edge_settings():
     return ctxt
 
 
+def _plumgrid_configs():
+    '''
+    Inspects plumgrid-director relation to get plumgrid virtup ip, username and password.
+    '''
+    ctxt = {}
+    for rid in relation_ids('plumgrid-configs'):
+        for unit in related_units(rid):
+            rdata = relation_get(rid=rid, unit=unit)
+            if 'plumgrid_virtual_ip' in rdata:
+                ctxt['plumgrid_virtual_ip'] = \
+                    rdata['plumgrid_virtual_ip']
+                ctxt['plumgrid_username'] = \
+                    rdata['plumgrid_username']
+                ctxt['plumgrid_password'] = \
+                    rdata['plumgrid_password']
+    return ctxt
+
+
 def _identity_context():
+    '''
+    Inspects keystone relation to get keystone credentials.
+    '''
     ctxs = [{
         'auth_host': gethostbyname(hostname),
         'auth_port': relation_get('service_port', unit, rid),
@@ -87,10 +108,6 @@ class NeutronPGPluginContext(context.NeutronContext):
 
         conf = config()
         enable_metadata = conf['enable-metadata']
-        # (TODO) get this information from director
-        pg_ctxt['pg_username'] = conf['plumgrid-username']
-        pg_ctxt['pg_password'] = conf['plumgrid-password']
-        pg_ctxt['virtual_ip'] = conf['plumgrid-virtual-ip']
         pg_ctxt['hardware_vendor_name'] = config('hardware-vendor-name')
         pg_ctxt['switch_username'] = config('switch-username')
         pg_ctxt['switch_password'] = config('switch-password')
@@ -114,6 +131,10 @@ class NeutronPGPluginContext(context.NeutronContext):
             pg_ctxt['service_protocol'] = identity_context['service_protocol']
             pg_ctxt['auth_port'] = identity_context['auth_port']
             pg_ctxt['auth_host'] = identity_context['auth_host']
+        plumgrid_configs = _plumgrid_configs()
+        if plumgrid_configs:
+            pg_ctxt['pg_username'] = plumgrid_configs['plumgrid_username']
+            pg_ctxt['pg_password'] = plumgrid_configs['plumgrid_password']
+            pg_ctxt['virtual_ip'] = plumgrid_configs['plumgrid_virtual_ip']
             print pg_ctxt
-
         return pg_ctxt
