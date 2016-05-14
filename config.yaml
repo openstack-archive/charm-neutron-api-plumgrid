@@ -39,3 +39,8 @@ options:
     description: |
       If True neutron-api charm will install neutron packages for the plugin
       configured. Also needs to be set in neutron-api charm
+  connector-type:
+    type: string
+    default: distributed
+    description: |
+      Tunnel learning

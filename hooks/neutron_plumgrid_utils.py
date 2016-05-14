@@ -12,6 +12,7 @@ import neutron_plumgrid_context
 from charmhelpers.contrib.openstack import templating
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.python.packages import pip_install
+from charmhelpers.contrib.python.packages import apt_install
 from charmhelpers.fetch import (
     apt_cache
 )
@@ -156,12 +157,17 @@ def install_networking_plumgrid():
     '''
     release = os_release('neutron-common', base='kilo')
     if config('networking-plumgrid-version') is None:
-        package_version = NETWORKING_PLUMGRID_VERSION[release]
+        #error point..."KeyError: 'mitaka'"...no net_pg_version for mitaka
+        #package_version = NETWORKING_PLUMGRID_VERSION[release]
+        print "######### install_networking_pg()"
     else:
         package_version = config('networking-plumgrid-version')
-    package_name = 'networking-plumgrid==%s' % package_version
-    pip_install(package_name, fatal=True)
-    if is_leader() and package_version != '2015.1.1.1':
+    #package_name = 'networking-plumgrid==%s' % package_version
+    #pip_install(package_name, fatal=True)
+    apt_install("git")
+    pip_install("git+https://github.com/openstack/networking-plumgrid.git", fatal=True)
+    if is_leader():
+        # and package_version != '2015.1.1.1':
         migrate_neutron_db()
 
 
