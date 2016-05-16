@@ -7,12 +7,10 @@ from collections import OrderedDict
 from copy import deepcopy
 import os
 import subprocess
-from subprocess import check_call
 import neutron_plumgrid_context
 from charmhelpers.contrib.openstack import templating
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.python.packages import pip_install
-from charmhelpers.contrib.python.packages import apt_install
 from charmhelpers.fetch import (
     apt_cache
 )
@@ -61,6 +59,7 @@ BASE_RESOURCE_MAP = OrderedDict([
 NETWORKING_PLUMGRID_VERSION = OrderedDict([
     ('kilo', '2015.1.1.1'),
     ('liberty', '2015.2.1.1'),
+    ('mitaka', '2016.1.1.1'),
 ])
 
 
@@ -82,10 +81,6 @@ def determine_packages():
                     "Build version '%s' for package '%s' not available" \
                     % (tag, pkg)
                 raise ValueError(error_msg)
-    cmd = ['mkdir', '-p', '/etc/neutron/plugins/plumgrid']
-    check_call(cmd)
-    cmd = ['touch', '/etc/neutron/plugins/plumgrid/plumgrid.ini']
-    check_call(cmd)
     return pkgs
 
 
@@ -157,17 +152,14 @@ def install_networking_plumgrid():
     '''
     release = os_release('neutron-common', base='kilo')
     if config('networking-plumgrid-version') is None:
-        #error point..."KeyError: 'mitaka'"...no net_pg_version for mitaka
-        #package_version = NETWORKING_PLUMGRID_VERSION[release]
-        print "######### install_networking_pg()"
+        package_version = NETWORKING_PLUMGRID_VERSION[release]
     else:
         package_version = config('networking-plumgrid-version')
-    #package_name = 'networking-plumgrid==%s' % package_version
-    #pip_install(package_name, fatal=True)
-    apt_install("git")
-    pip_install("git+https://github.com/openstack/networking-plumgrid.git", fatal=True)
-    if is_leader():
-        # and package_version != '2015.1.1.1':
+    package_name = 'networking-plumgrid==%s' % package_version
+    pip_install(package_name, fatal=True,
+                proxy=(config('pip-proxy') if
+                       config('pip-proxy') else None))
+    if is_leader() and package_version != '2015.1.1.1':
         migrate_neutron_db()
 
 

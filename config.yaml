@@ -43,4 +43,9 @@ options:
     type: string
     default: distributed
     description: |
-      Tunnel learning
+      connector type
+  pip-proxy:
+    type: string
+    default: None
+    description: |
+      Enables to install python modules behind a proxy

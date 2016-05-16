@@ -59,6 +59,7 @@ class NeutronPGContextTest(CharmTestCase):
             'hardware-vendor-name': 'vendor_name',
             'switch-username': 'plumgrid',
             'switch-password': 'plumgrid',
+            'connector-type': 'service',
         }
 
         def mock_config(key=None):
@@ -88,6 +89,7 @@ class NeutronPGContextTest(CharmTestCase):
             'switch_username': 'plumgrid',
             'switch_password': 'plumgrid',
             'metadata_mode': 'tunnel',
+            'connector_type': 'service',
             'nova_metadata_proxy_secret': 'plumgrid',
             'pg_metadata_ip': '169.254.169.254',
             'pg_metadata_subnet': '169.254.169.254/30',
