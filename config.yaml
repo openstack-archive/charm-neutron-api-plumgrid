@@ -43,7 +43,7 @@ options:
     type: string
     default: distributed
     description: |
-      connector type
+      Type of connector to be used. Supported types are distributed and service
   pip-proxy:
     type: string
     default: None
