@@ -2,7 +2,7 @@ options:
   enable-metadata:
     type: boolean
     default: True
-    description: "Set as True to enable metadata support"
+    description: Set as True to enable metadata support
   install_sources:
     default: 'ppa:plumgrid-team/stable'
     type: string
@@ -43,9 +43,9 @@ options:
     type: string
     default: distributed
     description: |
-      Type of connector to be used. Supported types are distributed and service
+      Type of connector to be used. Supported types are 'distributed' and 'service'
   pip-proxy:
     type: string
     default: None
     description: |
-      Enables to install python modules behind a proxy
+      Proxy address to install python modules behind a proxy
