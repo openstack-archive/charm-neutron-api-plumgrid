@@ -1,0 +1,8 @@
+#!/bin/sh
+export os_auth_url={{ service_protocol }}://{{ auth_host }}:35357/v2.0
+export os_admin_user={{ admin_user }}
+export os_admin_tenant={{ admin_tenant_name }}
+export os_admin_password={{ admin_password }}
+export pg_virtual_ip={{ virtual_ip }}
+export pg_username={{ pg_username }}
+export pg_password={{ pg_password }}
