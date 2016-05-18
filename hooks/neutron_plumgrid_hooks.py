@@ -71,7 +71,8 @@ def config_changed():
         for pkg in pkgs:
             apt_install(pkg, options=['--force-yes'], fatal=True)
         service_restart('neutron-server')
-    if charm_config.changed('networking-plumgrid-version') or charm_config.changed('pip-proxy'):
+    if (charm_config.changed('networking-plumgrid-version') or
+            charm_config.changed('pip-proxy')):
         ensure_files()
         service_restart('neutron-server')
     CONFIGS.write_all()
