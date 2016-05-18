@@ -29,3 +29,5 @@ requires:
     scope: container
   identity-admin:
     interface: keystone-admin
+  plumgrid-configs:
+    interface: plumgrid-configs
