@@ -44,4 +44,3 @@ Also the virtual IP on which PLUMgrid Console is going to be accessible should b
 # Contact Information
 
 Bilal Baqar <bbaqar@plumgrid.com>
-Bilal Ahmad <bilal@plumgrid.com>

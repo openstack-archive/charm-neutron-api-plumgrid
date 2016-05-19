@@ -6,38 +6,51 @@
 from collections import OrderedDict
 from copy import deepcopy
 import os
+import subprocess
+import neutron_plumgrid_context
 from charmhelpers.contrib.openstack import templating
+from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.python.packages import pip_install
 from charmhelpers.fetch import (
     apt_cache
 )
 from charmhelpers.core.hookenv import (
+    log,
     config,
-    is_leader
+    is_leader,
+    relation_set
 )
 from charmhelpers.contrib.openstack.utils import (
     os_release,
 )
-import subprocess
-import neutron_plumgrid_context
 
 TEMPLATES = 'templates/'
 
 PG_PACKAGES = [
-    'plumgrid-pythonlib',
+    'plumgrid-pythonlib'
 ]
 
 NEUTRON_CONF_DIR = "/etc/neutron"
 
 SU_FILE = '/etc/sudoers.d/neutron_sudoers'
+PLUMGRID_CONF = '%s/plugins/plumgrid/plumgrid.ini' % NEUTRON_CONF_DIR
 PGLIB_CONF = '%s/plugins/plumgrid/plumlib.ini' % NEUTRON_CONF_DIR
+PGRC = '%s/plugins/plumgrid/pgrc' % NEUTRON_CONF_DIR
 
 BASE_RESOURCE_MAP = OrderedDict([
     (SU_FILE, {
         'services': [],
         'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
     }),
+    (PLUMGRID_CONF, {
+        'services': ['neutron-server'],
+        'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
+    }),
     (PGLIB_CONF, {
+        'services': ['neutron-server'],
+        'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
+    }),
+    (PGRC, {
         'services': ['neutron-server'],
         'contexts': [neutron_plumgrid_context.NeutronPGPluginContext()],
     }),
@@ -46,6 +59,7 @@ BASE_RESOURCE_MAP = OrderedDict([
 NETWORKING_PLUMGRID_VERSION = OrderedDict([
     ('kilo', '2015.1.1.1'),
     ('liberty', '2015.2.1.1'),
+    ('mitaka', '2016.1.1.1'),
 ])
 
 
@@ -67,7 +81,6 @@ def determine_packages():
                     "Build version '%s' for package '%s' not available" \
                     % (tag, pkg)
                 raise ValueError(error_msg)
-    # return list(set(PG_PACKAGES))
     return pkgs
 
 
@@ -77,6 +90,9 @@ def resource_map():
     hook execution.
     '''
     resource_map = deepcopy(BASE_RESOURCE_MAP)
+    is_legacy_mode = config('manage-neutron-plugin-legacy-mode')
+    if is_legacy_mode:
+        del resource_map[PLUMGRID_CONF]
     return resource_map
 
 
@@ -85,7 +101,7 @@ def register_configs(release=None):
     Returns an object of the Openstack Tempating Class which contains the
     the context required for all templates of this charm.
     '''
-    release = release or os_release('neutron-server', base='kilo')
+    release = release or os_release('neutron-common', base='kilo')
     if release < 'kilo':
         raise ValueError('OpenStack %s release not supported' % release)
 
@@ -114,23 +130,57 @@ def ensure_files():
     os.chmod('/etc/sudoers.d/neutron_sudoers', 0o440)
 
 
+def _exec_cmd(cmd=None, error_msg='Command exited with ERRORs', fatal=False):
+    '''
+    Function to execute any bash command on the node.
+    '''
+    if cmd is None:
+        log("No command specified")
+    else:
+        if fatal:
+            subprocess.check_call(cmd)
+        else:
+            try:
+                subprocess.check_call(cmd)
+            except subprocess.CalledProcessError:
+                log(error_msg)
+
+
 def install_networking_plumgrid():
     '''
     Installs networking-plumgrid package
     '''
-    release = os_release('neutron-server', base='kilo')
+    release = os_release('neutron-common', base='kilo')
     if config('networking-plumgrid-version') is None:
         package_version = NETWORKING_PLUMGRID_VERSION[release]
     else:
         package_version = config('networking-plumgrid-version')
     package_name = 'networking-plumgrid==%s' % package_version
-    pip_install(package_name, fatal=True)
+    if config('pip-proxy') != "None":
+        pip_install(package_name, fatal=True, proxy=config('pip-proxy'))
+    else:
+        pip_install(package_name, fatal=True)
     if is_leader() and package_version != '2015.1.1.1':
         migrate_neutron_db()
 
 
 def migrate_neutron_db():
     release = os_release('neutron-common', base='kilo')
-    cmd = [('plumgrid-db-manage' if release == 'kilo'
-            else 'neutron-db-manage'), 'upgrade', 'heads']
-    subprocess.check_output(cmd)
+    _exec_cmd(cmd=[('plumgrid-db-manage' if release == 'kilo'
+                    else 'neutron-db-manage'), 'upgrade', 'heads'],
+              error_msg="db-manage command executed with errors",
+              fatal=False)
+
+
+def set_neutron_relation():
+    settings = {
+        'neutron-plugin': 'plumgrid',
+        'core-plugin': neutron_plugin_attribute('plumgrid', 'driver',
+                                                'neutron'),
+        'neutron-plugin-config': neutron_plugin_attribute('plumgrid',
+                                                          'config', 'neutron'),
+        'service-plugins': ' ',
+        'quota-driver': 'neutron.db.quota_db.DbQuotaDriver',
+    }
+
+    relation_set(relation_settings=settings)

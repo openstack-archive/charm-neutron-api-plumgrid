@@ -10,11 +10,12 @@ from charmhelpers.core.hookenv import (
     relation_get,
 )
 from charmhelpers.contrib.openstack import context
+from socket import gethostbyname
 
 
-def _edge_settings():
+def _edge_context():
     '''
-    Inspects plumgrid-edge relation to get metadata shared secret.
+    Inspects plumgrid-plugin relation to get metadata shared secret.
     '''
     ctxt = {
         'metadata_shared_secret': 'plumgrid',
@@ -28,39 +29,41 @@ def _edge_settings():
     return ctxt
 
 
-def _container_settings():
+def _plumgrid_context():
     '''
-    Inspects current container relation to get keystone context.
+    Inspects plumgrid-configs relation to get plumgrid virtual ip,
+    username and password.
     '''
-    container_settings = {
-        'auth_host': '10.0.0.1',
-        'auth_port': '35357',
-        'auth_protocol': 'http',
-        'service_protocol': 'http',
-        'service_host': '10.0.0.1',
-        'service_port': '35357',
-        'service_tenant': 'admin',
-        'service_username': 'admin',
-        'service_password': 'admin',
-    }
-    for rid in relation_ids('container'):
+    ctxt = {}
+    for rid in relation_ids('plumgrid-configs'):
         for unit in related_units(rid):
             rdata = relation_get(rid=rid, unit=unit)
-            if 'auth_host' not in rdata:
-                continue
-            container_settings = {
-                'auth_host': rdata['auth_host'],
-                'auth_port': rdata['auth_port'],
-                'auth_protocol': rdata['auth_protocol'],
-                'service_protocol': rdata['service_protocol'],
-                'service_host': rdata['service_host'],
-                'service_port': rdata['service_port'],
-                'service_tenant': rdata['service_tenant'],
-                'service_username': rdata['service_username'],
-                'service_password': rdata['service_password'],
-            }
-            return container_settings
-    return container_settings
+            if 'plumgrid_virtual_ip' in rdata:
+                ctxt['plumgrid_virtual_ip'] = \
+                    rdata['plumgrid_virtual_ip']
+                ctxt['plumgrid_username'] = \
+                    rdata['plumgrid_username']
+                ctxt['plumgrid_password'] = \
+                    rdata['plumgrid_password']
+    return ctxt
+
+
+def _identity_context():
+    '''
+    Inspects identity-admin relation to get keystone credentials.
+    '''
+    ctxs = [{
+        'auth_host': gethostbyname(hostname),
+        'auth_port': relation_get('service_port', unit, rid),
+        'admin_user': relation_get('service_username', unit, rid),
+        'admin_password': relation_get('service_password', unit, rid),
+        'service_protocol': relation_get('auth_protocol', unit, rid) or 'http',
+        'admin_tenant_name': relation_get('service_tenant_name', unit,
+                                          rid),
+    } for rid in relation_ids('identity-admin') for (unit, hostname) in
+        ((unit, relation_get('service_hostname', unit, rid))
+            for unit in related_units(rid)) if hostname]
+    return ctxs[0] if ctxs else {}
 
 
 class NeutronPGPluginContext(context.NeutronContext):
@@ -106,23 +109,33 @@ class NeutronPGPluginContext(context.NeutronContext):
 
         conf = config()
         enable_metadata = conf['enable-metadata']
+        pg_ctxt['hardware_vendor_name'] = config('hardware-vendor-name')
+        pg_ctxt['switch_username'] = config('switch-username')
+        pg_ctxt['switch_password'] = config('switch-password')
         pg_ctxt['enable_metadata'] = enable_metadata
         pg_ctxt['pg_metadata_ip'] = '169.254.169.254'
+        pg_ctxt['pg_metadata_subnet'] = '169.254.169.254/30'
         pg_ctxt['pg_metadata_port'] = '8775'
         pg_ctxt['metadata_mode'] = 'tunnel'
+        pg_ctxt['connector_type'] = config('connector-type')
         if enable_metadata:
-            plumgrid_edge_settings = _edge_settings()
+            plumgrid_edge_ctxt = _edge_context()
             pg_ctxt['nova_metadata_proxy_secret'] = \
-                plumgrid_edge_settings['metadata_shared_secret']
+                plumgrid_edge_ctxt['metadata_shared_secret']
         else:
             pg_ctxt['nova_metadata_proxy_secret'] = 'plumgrid'
-
-        neutron_api_settings = _container_settings()
-        pg_ctxt['admin_user'] = neutron_api_settings['service_username']
-        pg_ctxt['admin_password'] = neutron_api_settings['service_password']
-        pg_ctxt['admin_tenant_name'] = neutron_api_settings['service_tenant']
-        pg_ctxt['service_protocol'] = neutron_api_settings['auth_protocol']
-        pg_ctxt['auth_port'] = neutron_api_settings['auth_port']
-        pg_ctxt['auth_host'] = neutron_api_settings['auth_host']
-
+        identity_context = _identity_context()
+        if identity_context:
+            pg_ctxt['admin_user'] = identity_context['admin_user']
+            pg_ctxt['admin_password'] = identity_context['admin_password']
+            pg_ctxt['admin_tenant_name'] = \
+                identity_context['admin_tenant_name']
+            pg_ctxt['service_protocol'] = identity_context['service_protocol']
+            pg_ctxt['auth_port'] = identity_context['auth_port']
+            pg_ctxt['auth_host'] = identity_context['auth_host']
+        plumgrid_context = _plumgrid_context()
+        if plumgrid_context:
+            pg_ctxt['pg_username'] = plumgrid_context['plumgrid_username']
+            pg_ctxt['pg_password'] = plumgrid_context['plumgrid_password']
+            pg_ctxt['virtual_ip'] = plumgrid_context['plumgrid_virtual_ip']
         return pg_ctxt
