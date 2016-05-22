@@ -67,8 +67,7 @@ def config_changed():
             charm_config.changed('install_keys')):
         status_set('maintenance', 'Upgrading apt packages')
         if charm_config.changed('install_sources'):
-            if not configure_pg_sources():
-                log('IOError: /etc/apt/sources.list couldn\'t be updated')
+            configure_pg_sources()
         configure_sources()
         apt_update()
         pkgs = determine_packages()
