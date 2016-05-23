@@ -49,3 +49,8 @@ options:
     default: None
     description: |
       Proxy address to install python modules behind a proxy
+  user-domain-name:
+    type: string
+    default: Default
+    description: |
+      Keystone user domain name
