@@ -52,5 +52,4 @@ options:
   user-domain-name:
     type: string
     default: Default
-    description: |
-      Keystone user domain name
+    description: Keystone user domain name
