@@ -31,7 +31,7 @@ PG_PACKAGES = [
 ]
 
 NEUTRON_CONF_DIR = "/etc/neutron"
-
+SOURCES_LIST = '/etc/apt/sources.list'
 SU_FILE = '/etc/sudoers.d/neutron_sudoers'
 PLUMGRID_CONF = '%s/plugins/plumgrid/plumgrid.ini' % NEUTRON_CONF_DIR
 PGLIB_CONF = '%s/plugins/plumgrid/plumlib.ini' % NEUTRON_CONF_DIR
@@ -61,6 +61,22 @@ NETWORKING_PLUMGRID_VERSION = OrderedDict([
     ('liberty', '2015.2.1.1'),
     ('mitaka', '2016.1.1.1'),
 ])
+
+
+def configure_pg_sources():
+    '''
+    Returns true if install sources is updated in sources.list file
+    '''
+    try:
+        with open(SOURCES_LIST, 'r+') as sources:
+            all_lines = sources.readlines()
+            sources.seek(0)
+            for i in (line for line in all_lines if "plumgrid" not in line):
+                sources.write(i)
+            sources.truncate()
+        sources.close()
+    except IOError:
+        log('Unable to update /etc/apt/sources.list')
 
 
 def determine_packages():

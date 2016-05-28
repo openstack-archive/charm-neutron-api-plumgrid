@@ -118,6 +118,7 @@ class NeutronPGPluginContext(context.NeutronContext):
         pg_ctxt['pg_metadata_port'] = '8775'
         pg_ctxt['metadata_mode'] = 'tunnel'
         pg_ctxt['connector_type'] = config('connector-type')
+        pg_ctxt['user_domain_name'] = config('user-domain-name')
         if enable_metadata:
             plumgrid_edge_ctxt = _edge_context()
             pg_ctxt['nova_metadata_proxy_secret'] = \

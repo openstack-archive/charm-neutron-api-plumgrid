@@ -32,6 +32,7 @@ from neutron_plumgrid_utils import (
     restart_map,
     ensure_files,
     set_neutron_relation,
+    configure_pg_sources
 )
 
 hooks = Hooks()
@@ -65,6 +66,8 @@ def config_changed():
         charm_config.changed('plumgrid-build') or
             charm_config.changed('install_keys')):
         status_set('maintenance', 'Upgrading apt packages')
+        if charm_config.changed('install_sources'):
+            configure_pg_sources()
         configure_sources()
         apt_update()
         pkgs = determine_packages()
