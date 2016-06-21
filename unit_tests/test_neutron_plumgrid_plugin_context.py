@@ -61,6 +61,7 @@ class NeutronPGContextTest(CharmTestCase):
             'switch-password': 'plumgrid',
             'connector-type': 'service',
             'user-domain-name': 'Default',
+            'project-domain-name': 'Default'
         }
 
         def mock_config(key=None):
@@ -92,6 +93,7 @@ class NeutronPGContextTest(CharmTestCase):
             'metadata_mode': 'tunnel',
             'connector_type': 'service',
             'user_domain_name': 'Default',
+            'project_domain_name': 'Default',
             'nova_metadata_proxy_secret': 'plumgrid',
             'pg_metadata_ip': '169.254.169.254',
             'pg_metadata_subnet': '169.254.169.254/30',
