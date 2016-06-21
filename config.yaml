@@ -53,3 +53,7 @@ options:
     type: string
     default: Default
     description: Keystone user domain name
+  project-domain-name:
+    type: string
+    default: Default
+    description: Keystone project domain name
