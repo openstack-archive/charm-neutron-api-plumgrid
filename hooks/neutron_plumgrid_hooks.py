@@ -64,6 +64,7 @@ def config_changed():
     charm_config = config()
     if (charm_config.changed('install_sources') or
         charm_config.changed('plumgrid-build') or
+        charm_config.changed('networking-build') or
             charm_config.changed('install_keys')):
         status_set('maintenance', 'Upgrading apt packages')
         if charm_config.changed('install_sources'):
