@@ -57,3 +57,17 @@ options:
     type: string
     default: Default
     description: Keystone project domain name
+  enable-deb-networking-install:
+    type: boolean
+    default: False
+    description: |
+      If enabled networking plumgrid is installed from deb package on LCM instead of
+      installation using pip
+  enable-flow-tap:
+    type: boolean
+    default: True
+    description: Toggles reverse flow creation for tap based policies
+  enable-metaconfig:
+    type: boolean
+    default: True
+    description: Enables/disables nova communication for metaconfig

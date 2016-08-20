@@ -61,7 +61,9 @@ class NeutronPGContextTest(CharmTestCase):
             'switch-password': 'plumgrid',
             'connector-type': 'service',
             'user-domain-name': 'Default',
-            'project-domain-name': 'Default'
+            'project-domain-name': 'Default',
+            'enable-flow-tap': 'True',
+            'enable-metaconfig': 'True',
         }
 
         def mock_config(key=None):
@@ -98,5 +100,7 @@ class NeutronPGContextTest(CharmTestCase):
             'pg_metadata_ip': '169.254.169.254',
             'pg_metadata_subnet': '169.254.169.254/30',
             'pg_metadata_port': '8775',
+            'enable_reverse_flow_tap': 'True',
+            'nova_metaconfig': 'True',
         }
         self.assertEquals(expect, napi_ctxt())
