@@ -28,7 +28,8 @@ from charmhelpers.contrib.openstack.utils import (
 TEMPLATES = 'templates/'
 
 PG_PACKAGES = [
-    'plumgrid-pythonlib'
+    'plumgrid-pythonlib',
+    'networking-plumgrid'
 ]
 
 NEUTRON_CONF_DIR = "/etc/neutron"
@@ -86,8 +87,14 @@ def determine_packages():
     enable PLUMgrid in Openstack.
     '''
     pkgs = []
-    tag = config('plumgrid-build')
+    tag = 'latest'
     for pkg in PG_PACKAGES:
+        if pkg == 'plumgrid-pythonlib':
+            tag = config('plumgrid-build')
+        elif (pkg == 'networking-plumgrid' and
+              config('enable-deb-networking-install')):
+            tag = config('networking-build')
+
         if tag == 'latest':
             pkgs.append(pkg)
         else:
