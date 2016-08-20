@@ -12,6 +12,7 @@ from charmhelpers.contrib.openstack import templating
 from charmhelpers.contrib.openstack.neutron import neutron_plugin_attribute
 from charmhelpers.contrib.python.packages import pip_install
 from charmhelpers.fetch import (
+    apt_install,
     apt_cache
 )
 from charmhelpers.core.hookenv import (
@@ -166,18 +167,23 @@ def install_networking_plumgrid():
     '''
     Installs networking-plumgrid package
     '''
-    release = os_release('neutron-common', base='kilo')
-    if config('networking-plumgrid-version') is None:
-        package_version = NETWORKING_PLUMGRID_VERSION[release]
+    if not config('enable-deb-networking-install'):
+        release = os_release('neutron-common', base='kilo')
+        if config('networking-plumgrid-version') is None:
+            package_version = NETWORKING_PLUMGRID_VERSION[release]
+        else:
+            package_version = config('networking-plumgrid-version')
+        package_name = 'networking-plumgrid==%s' % package_version
+        if config('pip-proxy') != "None":
+            pip_install(package_name, fatal=True, proxy=config('pip-proxy'))
+        else:
+            pip_install(package_name, fatal=True)
+        if is_leader() and package_version != '2015.1.1.1':
+            migrate_neutron_db()
     else:
-        package_version = config('networking-plumgrid-version')
-    package_name = 'networking-plumgrid==%s' % package_version
-    if config('pip-proxy') != "None":
-        pip_install(package_name, fatal=True, proxy=config('pip-proxy'))
-    else:
-        pip_install(package_name, fatal=True)
-    if is_leader() and package_version != '2015.1.1.1':
-        migrate_neutron_db()
+        apt_install('networking-plumgrid', options=['--force-yes'], fatal=True)
+        if is_leader():
+            migrate_neutron_db()
 
 
 def migrate_neutron_db():

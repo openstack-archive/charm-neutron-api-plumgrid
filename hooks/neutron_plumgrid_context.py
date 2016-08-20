@@ -120,6 +120,8 @@ class NeutronPGPluginContext(context.NeutronContext):
         pg_ctxt['connector_type'] = config('connector-type')
         pg_ctxt['user_domain_name'] = config('user-domain-name')
         pg_ctxt['project_domain_name'] = config('project-domain-name')
+        pg_ctxt['enable_reverse_flow_tap'] = config('enable-flow-tap')
+        pg_ctxt['nova_metaconfig'] = config('enable-metaconfig')
         if enable_metadata:
             plumgrid_edge_ctxt = _edge_context()
             pg_ctxt['nova_metadata_proxy_secret'] = \
