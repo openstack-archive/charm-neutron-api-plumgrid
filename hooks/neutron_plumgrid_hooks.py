@@ -6,7 +6,6 @@
 # in this file.
 
 import sys
-from charmhelpers.core.host import service_running
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
@@ -17,7 +16,9 @@ from charmhelpers.core.hookenv import (
 
 from charmhelpers.core.host import (
     restart_on_change,
-    service_restart
+    service_start,
+    service_stop,
+    service_running
 )
 
 from charmhelpers.fetch import (
@@ -74,12 +75,14 @@ def config_changed():
         pkgs = determine_packages()
         for pkg in pkgs:
             apt_install(pkg, options=['--force-yes'], fatal=True)
-        service_restart('neutron-server')
+        service_stop('neutron-server')
     if (charm_config.changed('networking-plumgrid-version') or
             charm_config.changed('pip-proxy')):
         ensure_files()
-        service_restart('neutron-server')
+        service_stop('neutron-server')
     CONFIGS.write_all()
+    if not service_running('neutron-server'):
+        service_start('neutron-server')
 
 
 @hooks.hook('neutron-plugin-api-relation-joined')
