@@ -87,17 +87,16 @@ def determine_packages():
     enable PLUMgrid in Openstack.
     '''
     pkgs = []
-    tag = 'latest'
     for pkg in PG_PACKAGES:
+        tag = ''
         if pkg == 'plumgrid-pythonlib':
             tag = config('plumgrid-build')
         elif (pkg == 'networking-plumgrid' and
               config('enable-deb-networking-install')):
             tag = config('networking-build')
-
         if tag == 'latest':
             pkgs.append(pkg)
-        else:
+        elif tag:
             if tag in [i.ver_str for i in apt_cache()[pkg].version_list]:
                 pkgs.append('%s=%s' % (pkg, tag))
             else:
