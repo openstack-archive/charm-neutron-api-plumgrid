@@ -23,7 +23,7 @@ To enable PLUMgrid in neutron make the configuration in the neutron-api charm as
 
 # Known Limitations and Issues
 
-The charm currently only supports Kilo Openstack Release.
+This charm currently doesn't support Ubuntu 16.04.
 
 # Configuration
 
@@ -44,3 +44,5 @@ Also the virtual IP on which PLUMgrid Console is going to be accessible should b
 # Contact Information
 
 Bilal Baqar <bbaqar@plumgrid.com>
+Javeria Khan <javeriak@plumgrid.com>
+Junaid Ali <junaidali@plumgrid.com>
