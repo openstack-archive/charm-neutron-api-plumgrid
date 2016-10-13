@@ -1,18 +1,16 @@
 #!/usr/bin/make
 PYTHON := /usr/bin/env python
 
-virtualenv:
-	virtualenv .venv
-	.venv/bin/pip install flake8 nose coverage mock pyyaml netifaces \
-        netaddr jinja2 pyflakes pep8 six pbr funcsigs psutil
+lint:
+	@tox -e pep8
 
-lint: virtualenv
-	.venv/bin/flake8 --exclude hooks/charmhelpers hooks unit_tests tests --ignore E402
-	@charm proof
+test:
+	@echo Starting unit tests...
+	@tox -e py27
 
-unit_test: virtualenv
-	@echo Starting tests...
-	@.venv/bin/nosetests --nologcapture  --with-coverage unit_tests
+functional_test:
+	@echo Starting Amulet tests...
+	@tox -e func27
 
 bin/charm_helpers_sync.py:
 	@mkdir -p bin
@@ -20,12 +18,9 @@ bin/charm_helpers_sync.py:
         > bin/charm_helpers_sync.py
 
 sync: bin/charm_helpers_sync.py
-	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-sync.yaml
+	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-hooks.yaml
+	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-tests.yaml
 
-publish: lint unit_test
+publish: lint test
 	bzr push lp:charms/neutron-api-plumgrid
 	bzr push lp:charms/trusty/neutron-api-plumgrid
-
-test:
-	@echo Starting Amulet tests...
-	@juju test -v -p AMULET_HTTP_PROXY,AMULET_OS_VIP --timeout 2700
