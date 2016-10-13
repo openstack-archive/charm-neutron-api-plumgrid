@@ -17,7 +17,9 @@ Instructions on using the charm:
 
     juju deploy neutron-api
     juju deploy neutron-api-plumgrid
-    juju add-relation neutron-api neutron-api-plumgrid
+    juju deploy plumgrid-director
+    juju add-relation neutron-api-plumgrid neutron-api
+    juju add-relation neutron-api-plumgrid plumgrid-director
 
 To enable PLUMgrid in neutron make the configuration in the neutron-api charm as specified in the configuration section below.
 
@@ -32,9 +34,17 @@ Example Config
     neutron-api-plumgrid:
         install_sources: 'ppa:plumgrid-team/stable'
         install_keys: 'null'
-        enable-metadata: False
+        enable-metadata: True
+        manage-neutron-plugin-legacy-mode: false
     neutron-api:
         neutron-plugin: "plumgrid"
+        manage-neutron-plugin-legacy-mode: false
+        neutron-security-groups: true
+    plumgrid-director:
+        install_sources: 'ppa:plumgrid-team/stable'
+        install_keys: 'null'
+        plumgrid-password: plumgrid
+        plumgrid-username: plumgrid
         plumgrid-virtual-ip: "192.168.100.250"
 
 Provide the source repo path for PLUMgrid Debs in 'install_sources' and the corresponding keys in 'install_keys'
