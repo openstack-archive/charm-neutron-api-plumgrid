@@ -1,0 +1,10 @@
+Verified+1: Canonical CI <uosci-testing-bot@ubuntu.com>
+Code-Review+2: Bilal Baqar <bbaqar@plumgrid.com>
+Workflow+1: Bilal Baqar <bbaqar@plumgrid.com>
+Code-Review+1: Junaid Ali <junaid_ali4@yahoo.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 25 Oct 2016 13:45:45 +0000
+Reviewed-on: https://review.openstack.org/386253
+Project: openstack/charm-neutron-api-plumgrid
+Branch: refs/heads/master
