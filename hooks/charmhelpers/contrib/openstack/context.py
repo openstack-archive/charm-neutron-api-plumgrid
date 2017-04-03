@@ -1,21 +1,20 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import glob
 import json
+import math
 import os
 import re
 import time
@@ -59,6 +58,9 @@ from charmhelpers.core.host import (
     mkdir,
     write_file,
     pwgen,
+    lsb_release,
+    CompareHostReleases,
+    is_container,
 )
 from charmhelpers.contrib.hahelpers.cluster import (
     determine_apache_port,
@@ -91,13 +93,19 @@ from charmhelpers.contrib.network.ip import (
 from charmhelpers.contrib.openstack.utils import (
     config_flags_parser,
     get_host_ip,
+    git_determine_usr_bin,
+    git_determine_python_path,
+    enable_memcache,
 )
 from charmhelpers.core.unitdata import kv
 
 try:
     import psutil
 except ImportError:
-    apt_install('python-psutil', fatal=True)
+    if six.PY2:
+        apt_install('python-psutil', fatal=True)
+    else:
+        apt_install('python3-psutil', fatal=True)
     import psutil
 
 CA_CERT_PATH = '/usr/local/share/ca-certificates/keystone_juju_ca_cert.crt'
@@ -149,7 +157,8 @@ class OSContextGenerator(object):
 
         if self.missing_data:
             self.complete = False
-            log('Missing required data: %s' % ' '.join(self.missing_data), level=INFO)
+            log('Missing required data: %s' % ' '.join(self.missing_data),
+                level=INFO)
         else:
             self.complete = True
         return self.complete
@@ -207,8 +216,9 @@ class SharedDBContext(OSContextGenerator):
                 hostname_key = "{}_hostname".format(self.relation_prefix)
             else:
                 hostname_key = "hostname"
-            access_hostname = get_address_in_network(access_network,
-                                                     unit_get('private-address'))
+            access_hostname = get_address_in_network(
+                access_network,
+                unit_get('private-address'))
             set_hostname = relation_get(attribute=hostname_key,
                                         unit=local_unit())
             if set_hostname != access_hostname:
@@ -302,7 +312,10 @@ def db_ssl(rdata, ctxt, ssl_dir):
 
 class IdentityServiceContext(OSContextGenerator):
 
-    def __init__(self, service=None, service_user=None, rel_name='identity-service'):
+    def __init__(self,
+                 service=None,
+                 service_user=None,
+                 rel_name='identity-service'):
         self.service = service
         self.service_user = service_user
         self.rel_name = rel_name
@@ -345,6 +358,10 @@ class IdentityServiceContext(OSContextGenerator):
                              'auth_protocol': auth_protocol,
                              'api_version': api_version})
 
+                if float(api_version) > 2:
+                    ctxt.update({'admin_domain_name':
+                                 rdata.get('service_domain')})
+
                 if self.context_complete(ctxt):
                     # NOTE(jamespage) this is required for >= icehouse
                     # so a missing value just indicates keystone needs
@@ -385,16 +402,20 @@ class AMQPContext(OSContextGenerator):
         for rid in relation_ids(self.rel_name):
             ha_vip_only = False
             self.related = True
+            transport_hosts = None
+            rabbitmq_port = '5672'
             for unit in related_units(rid):
                 if relation_get('clustered', rid=rid, unit=unit):
                     ctxt['clustered'] = True
                     vip = relation_get('vip', rid=rid, unit=unit)
                     vip = format_ipv6_addr(vip) or vip
                     ctxt['rabbitmq_host'] = vip
+                    transport_hosts = [vip]
                 else:
                     host = relation_get('private-address', rid=rid, unit=unit)
                     host = format_ipv6_addr(host) or host
                     ctxt['rabbitmq_host'] = host
+                    transport_hosts = [host]
 
                 ctxt.update({
                     'rabbitmq_user': username,
@@ -406,6 +427,7 @@ class AMQPContext(OSContextGenerator):
                 ssl_port = relation_get('ssl_port', rid=rid, unit=unit)
                 if ssl_port:
                     ctxt['rabbit_ssl_port'] = ssl_port
+                    rabbitmq_port = ssl_port
 
                 ssl_ca = relation_get('ssl_ca', rid=rid, unit=unit)
                 if ssl_ca:
@@ -442,7 +464,19 @@ class AMQPContext(OSContextGenerator):
                     host = format_ipv6_addr(host) or host
                     rabbitmq_hosts.append(host)
 
-                ctxt['rabbitmq_hosts'] = ','.join(sorted(rabbitmq_hosts))
+                rabbitmq_hosts = sorted(rabbitmq_hosts)
+                ctxt['rabbitmq_hosts'] = ','.join(rabbitmq_hosts)
+                transport_hosts = rabbitmq_hosts
+
+            if transport_hosts:
+                transport_url_hosts = ','.join([
+                    "{}:{}@{}:{}".format(ctxt['rabbitmq_user'],
+                                         ctxt['rabbitmq_password'],
+                                         host_,
+                                         rabbitmq_port)
+                    for host_ in transport_hosts])
+                ctxt['transport_url'] = "rabbit://{}/{}".format(
+                    transport_url_hosts, vhost)
 
         oslo_messaging_flags = conf.get('oslo-messaging-flags', None)
         if oslo_messaging_flags:
@@ -474,13 +508,16 @@ class CephContext(OSContextGenerator):
                     ctxt['auth'] = relation_get('auth', rid=rid, unit=unit)
                 if not ctxt.get('key'):
                     ctxt['key'] = relation_get('key', rid=rid, unit=unit)
-                ceph_pub_addr = relation_get('ceph-public-address', rid=rid,
+
+                ceph_addrs = relation_get('ceph-public-address', rid=rid,
+                                          unit=unit)
+                if ceph_addrs:
+                    for addr in ceph_addrs.split(' '):
+                        mon_hosts.append(format_ipv6_addr(addr) or addr)
+                else:
+                    priv_addr = relation_get('private-address', rid=rid,
                                              unit=unit)
-                unit_priv_addr = relation_get('private-address', rid=rid,
-                                              unit=unit)
-                ceph_addr = ceph_pub_addr or unit_priv_addr
-                ceph_addr = format_ipv6_addr(ceph_addr) or ceph_addr
-                mon_hosts.append(ceph_addr)
+                    mon_hosts.append(format_ipv6_addr(priv_addr) or priv_addr)
 
         ctxt['mon_hosts'] = ' '.join(sorted(mon_hosts))
 
@@ -645,7 +682,7 @@ class ApacheSSLContext(OSContextGenerator):
     service_namespace = None
 
     def enable_modules(self):
-        cmd = ['a2enmod', 'ssl', 'proxy', 'proxy_http']
+        cmd = ['a2enmod', 'ssl', 'proxy', 'proxy_http', 'headers']
         check_call(cmd)
 
     def configure_cert(self, cn=None):
@@ -1185,6 +1222,10 @@ class BindHostContext(OSContextGenerator):
             return {'bind_host': '0.0.0.0'}
 
 
+MAX_DEFAULT_WORKERS = 4
+DEFAULT_MULTIPLIER = 2
+
+
 class WorkerConfigContext(OSContextGenerator):
 
     @property
@@ -1196,8 +1237,57 @@ class WorkerConfigContext(OSContextGenerator):
             return psutil.NUM_CPUS
 
     def __call__(self):
-        multiplier = config('worker-multiplier') or 0
-        ctxt = {"workers": self.num_cpus * multiplier}
+        multiplier = config('worker-multiplier') or DEFAULT_MULTIPLIER
+        count = int(self.num_cpus * multiplier)
+        if multiplier > 0 and count == 0:
+            count = 1
+
+        if config('worker-multiplier') is None and is_container():
+            # NOTE(jamespage): Limit unconfigured worker-multiplier
+            #                  to MAX_DEFAULT_WORKERS to avoid insane
+            #                  worker configuration in LXD containers
+            #                  on large servers
+            # Reference: https://pad.lv/1665270
+            count = min(count, MAX_DEFAULT_WORKERS)
+
+        ctxt = {"workers": count}
+        return ctxt
+
+
+class WSGIWorkerConfigContext(WorkerConfigContext):
+
+    def __init__(self, name=None, script=None, admin_script=None,
+                 public_script=None, process_weight=1.00,
+                 admin_process_weight=0.75, public_process_weight=0.25):
+        self.service_name = name
+        self.user = name
+        self.group = name
+        self.script = script
+        self.admin_script = admin_script
+        self.public_script = public_script
+        self.process_weight = process_weight
+        self.admin_process_weight = admin_process_weight
+        self.public_process_weight = public_process_weight
+
+    def __call__(self):
+        multiplier = config('worker-multiplier') or 1
+        total_processes = self.num_cpus * multiplier
+        ctxt = {
+            "service_name": self.service_name,
+            "user": self.user,
+            "group": self.group,
+            "script": self.script,
+            "admin_script": self.admin_script,
+            "public_script": self.public_script,
+            "processes": int(math.ceil(self.process_weight * total_processes)),
+            "admin_processes": int(math.ceil(self.admin_process_weight *
+                                             total_processes)),
+            "public_processes": int(math.ceil(self.public_process_weight *
+                                              total_processes)),
+            "threads": 1,
+            "usr_bin": git_determine_usr_bin(),
+            "python_path": git_determine_python_path(),
+        }
         return ctxt
 
 
@@ -1419,9 +1509,9 @@ class InternalEndpointContext(OSContextGenerator):
 class AppArmorContext(OSContextGenerator):
     """Base class for apparmor contexts."""
 
-    def __init__(self):
+    def __init__(self, profile_name=None):
         self._ctxt = None
-        self.aa_profile = None
+        self.aa_profile = profile_name
         self.aa_utils_packages = ['apparmor-utils']
 
     @property
@@ -1438,7 +1528,10 @@ class AppArmorContext(OSContextGenerator):
         :return ctxt: Dictionary of the apparmor profile or None
         """
         if config('aa-profile-mode') in ['disable', 'enforce', 'complain']:
-            ctxt = {'aa-profile-mode': config('aa-profile-mode')}
+            ctxt = {'aa_profile_mode': config('aa-profile-mode'),
+                    'ubuntu_release': lsb_release()['DISTRIB_RELEASE']}
+            if self.aa_profile:
+                ctxt['aa_profile'] = self.aa_profile
         else:
             ctxt = None
         return ctxt
@@ -1482,10 +1575,10 @@ class AppArmorContext(OSContextGenerator):
             log("Not enabling apparmor Profile")
             return
         self.install_aa_utils()
-        cmd = ['aa-{}'.format(self.ctxt['aa-profile-mode'])]
-        cmd.append(self.ctxt['aa-profile'])
+        cmd = ['aa-{}'.format(self.ctxt['aa_profile_mode'])]
+        cmd.append(self.ctxt['aa_profile'])
         log("Setting up the apparmor profile for {} in {} mode."
-            "".format(self.ctxt['aa-profile'], self.ctxt['aa-profile-mode']))
+            "".format(self.ctxt['aa_profile'], self.ctxt['aa_profile_mode']))
         try:
             check_call(cmd)
         except CalledProcessError as e:
@@ -1494,12 +1587,46 @@ class AppArmorContext(OSContextGenerator):
             # apparmor is yet unaware of the profile and aa-disable aa-profile
             # fails. If aa-disable learns to read profile files first this can
             # be removed.
-            if self.ctxt['aa-profile-mode'] == 'disable':
+            if self.ctxt['aa_profile_mode'] == 'disable':
                 log("Manually disabling the apparmor profile for {}."
-                    "".format(self.ctxt['aa-profile']))
+                    "".format(self.ctxt['aa_profile']))
                 self.manually_disable_aa_profile()
                 return
             status_set('blocked', "Apparmor profile {} failed to be set to {}."
-                                  "".format(self.ctxt['aa-profile'],
-                                            self.ctxt['aa-profile-mode']))
+                                  "".format(self.ctxt['aa_profile'],
+                                            self.ctxt['aa_profile_mode']))
             raise e
+
+
+class MemcacheContext(OSContextGenerator):
+    """Memcache context
+
+    This context provides options for configuring a local memcache client and
+    server
+    """
+
+    def __init__(self, package=None):
+        """
+        @param package: Package to examine to extrapolate OpenStack release.
+                        Used when charms have no openstack-origin config
+                        option (ie subordinates)
+        """
+        self.package = package
+
+    def __call__(self):
+        ctxt = {}
+        ctxt['use_memcache'] = enable_memcache(package=self.package)
+        if ctxt['use_memcache']:
+            # Trusty version of memcached does not support ::1 as a listen
+            # address so use host file entry instead
+            release = lsb_release()['DISTRIB_CODENAME'].lower()
+            if CompareHostReleases(release) > 'trusty':
+                ctxt['memcache_server'] = '::1'
+            else:
+                ctxt['memcache_server'] = 'ip6-localhost'
+            ctxt['memcache_server_formatted'] = '[::1]'
+            ctxt['memcache_port'] = '11211'
+            ctxt['memcache_url'] = 'inet6:{}:{}'.format(
+                ctxt['memcache_server_formatted'],
+                ctxt['memcache_port'])
+        return ctxt

@@ -46,7 +46,7 @@ class TestNeutronPGUtils(CharmTestCase):
                 self.configs.append(config)
                 self.ctxts.append(ctxt)
 
-        self.os_release.return_value = 'trusty'
+        self.os_release.return_value = 'kilo'
         templating.OSConfigRenderer.side_effect = _mock_OSConfigRenderer
         _regconfs = nutils.register_configs()
         confs = ['/etc/sudoers.d/neutron_sudoers',

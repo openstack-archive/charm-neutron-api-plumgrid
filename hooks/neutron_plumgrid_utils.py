@@ -23,6 +23,7 @@ from charmhelpers.core.hookenv import (
 )
 from charmhelpers.contrib.openstack.utils import (
     os_release,
+    CompareOpenStackReleases,
 )
 
 TEMPLATES = 'templates/'
@@ -125,7 +126,7 @@ def register_configs(release=None):
     the context required for all templates of this charm.
     '''
     release = release or os_release('neutron-common', base='kilo')
-    if release < 'kilo':
+    if CompareOpenStackReleases(release) < 'kilo':
         raise ValueError('OpenStack %s release not supported' % release)
 
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,

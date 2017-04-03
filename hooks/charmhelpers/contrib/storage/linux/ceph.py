@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 #
 # Copyright 2012 Canonical Ltd.
@@ -23,9 +21,10 @@
 #  James Page <james.page@ubuntu.com>
 #  Adam Gandelman <adamg@ubuntu.com>
 #
-import bisect
+
 import errno
 import hashlib
+import math
 import six
 
 import os
@@ -41,6 +40,7 @@ from subprocess import (
 )
 from charmhelpers.core.hookenv import (
     config,
+    service_name,
     local_unit,
     relation_get,
     relation_ids,
@@ -78,8 +78,17 @@ log to syslog = {use_syslog}
 err to syslog = {use_syslog}
 clog to syslog = {use_syslog}
 """
-# For 50 < osds < 240,000 OSDs (Roughly 1 Exabyte at 6T OSDs)
-powers_of_two = [8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608]
+
+# The number of placement groups per OSD to target for placement group
+# calculations. This number is chosen as 100 due to the ceph PG Calc
+# documentation recommending to choose 100 for clusters which are not
+# expected to increase in the foreseeable future. Since the majority of the
+# calculations are done on deployment, target the case of non-expanding
+# clusters as the default.
+DEFAULT_PGS_PER_OSD_TARGET = 100
+DEFAULT_POOL_WEIGHT = 10.0
+LEGACY_PG_COUNT = 200
+DEFAULT_MINIMUM_PGS = 2
 
 
 def validator(value, valid_type, valid_range=None):
@@ -186,42 +195,111 @@ class Pool(object):
             check_call(['ceph', '--id', self.service, 'osd', 'tier', 'remove-overlay', self.name])
             check_call(['ceph', '--id', self.service, 'osd', 'tier', 'remove', self.name, cache_pool])
 
-    def get_pgs(self, pool_size):
-        """
-        :param pool_size: int. pool_size is either the number of replicas for replicated pools or the K+M sum for
-            erasure coded pools
+    def get_pgs(self, pool_size, percent_data=DEFAULT_POOL_WEIGHT):
+        """Return the number of placement groups to use when creating the pool.
+
+        Returns the number of placement groups which should be specified when
+        creating the pool. This is based upon the calculation guidelines
+        provided by the Ceph Placement Group Calculator (located online at
+        http://ceph.com/pgcalc/).
+
+        The number of placement groups are calculated using the following:
+
+            (Target PGs per OSD) * (OSD #) * (%Data)
+            ----------------------------------------
+                         (Pool size)
+
+        Per the upstream guidelines, the OSD # should really be considered
+        based on the number of OSDs which are eligible to be selected by the
+        pool. Since the pool creation doesn't specify any of CRUSH set rules,
+        the default rule will be dependent upon the type of pool being
+        created (replicated or erasure).
+
+        This code makes no attempt to determine the number of OSDs which can be
+        selected for the specific rule, rather it is left to the user to tune
+        in the form of 'expected-osd-count' config option.
+
+        :param pool_size: int. pool_size is either the number of replicas for
+            replicated pools or the K+M sum for erasure coded pools
+        :param percent_data: float. the percentage of data that is expected to
+            be contained in the pool for the specific OSD set. Default value
+            is to assume 10% of the data is for this pool, which is a
+            relatively low % of the data but allows for the pg_num to be
+            increased. NOTE: the default is primarily to handle the scenario
+            where related charms requiring pools has not been upgraded to
+            include an update to indicate their relative usage of the pools.
         :return: int.  The number of pgs to use.
         """
+
+        # Note: This calculation follows the approach that is provided
+        # by the Ceph PG Calculator located at http://ceph.com/pgcalc/.
         validator(value=pool_size, valid_type=int)
+
+        # Ensure that percent data is set to something - even with a default
+        # it can be set to None, which would wreak havoc below.
+        if percent_data is None:
+            percent_data = DEFAULT_POOL_WEIGHT
+
+        # If the expected-osd-count is specified, then use the max between
+        # the expected-osd-count and the actual osd_count
         osd_list = get_osds(self.service)
-        if not osd_list:
+        expected = config('expected-osd-count') or 0
+
+        if osd_list:
+            osd_count = max(expected, len(osd_list))
+
+            # Log a message to provide some insight if the calculations claim
+            # to be off because someone is setting the expected count and
+            # there are more OSDs in reality. Try to make a proper guess
+            # based upon the cluster itself.
+            if expected and osd_count != expected:
+                log("Found more OSDs than provided expected count. "
+                    "Using the actual count instead", INFO)
+        elif expected:
+            # Use the expected-osd-count in older ceph versions to allow for
+            # a more accurate pg calculations
+            osd_count = expected
+        else:
             # NOTE(james-page): Default to 200 for older ceph versions
             # which don't support OSD query from cli
-            return 200
+            return LEGACY_PG_COUNT
 
-        osd_list_length = len(osd_list)
-        # Calculate based on Ceph best practices
-        if osd_list_length < 5:
-            return 128
-        elif 5 < osd_list_length < 10:
-            return 512
-        elif 10 < osd_list_length < 50:
-            return 4096
+        percent_data /= 100.0
+        target_pgs_per_osd = config('pgs-per-osd') or DEFAULT_PGS_PER_OSD_TARGET
+        num_pg = (target_pgs_per_osd * osd_count * percent_data) // pool_size
+
+        # NOTE: ensure a sane minimum number of PGS otherwise we don't get any
+        #       reasonable data distribution in minimal OSD configurations
+        if num_pg < DEFAULT_MINIMUM_PGS:
+            num_pg = DEFAULT_MINIMUM_PGS
+
+        # The CRUSH algorithm has a slight optimization for placement groups
+        # with powers of 2 so find the nearest power of 2. If the nearest
+        # power of 2 is more than 25% below the original value, the next
+        # highest value is used. To do this, find the nearest power of 2 such
+        # that 2^n <= num_pg, check to see if its within the 25% tolerance.
+        exponent = math.floor(math.log(num_pg, 2))
+        nearest = 2 ** exponent
+        if (num_pg - nearest) > (num_pg * 0.25):
+            # Choose the next highest power of 2 since the nearest is more
+            # than 25% below the original value.
+            return int(nearest * 2)
         else:
-            estimate = (osd_list_length * 100) / pool_size
-            # Return the next nearest power of 2
-            index = bisect.bisect_right(powers_of_two, estimate)
-            return powers_of_two[index]
+            return int(nearest)
 
 
 class ReplicatedPool(Pool):
-    def __init__(self, service, name, pg_num=None, replicas=2):
+    def __init__(self, service, name, pg_num=None, replicas=2,
+                 percent_data=10.0):
         super(ReplicatedPool, self).__init__(service=service, name=name)
         self.replicas = replicas
-        if pg_num is None:
-            self.pg_num = self.get_pgs(self.replicas)
+        if pg_num:
+            # Since the number of placement groups were specified, ensure
+            # that there aren't too many created.
+            max_pgs = self.get_pgs(self.replicas, 100.0)
+            self.pg_num = min(pg_num, max_pgs)
         else:
-            self.pg_num = pg_num
+            self.pg_num = self.get_pgs(self.replicas, percent_data)
 
     def create(self):
         if not pool_exists(self.service, self.name):
@@ -240,30 +318,39 @@ class ReplicatedPool(Pool):
 
 # Default jerasure erasure coded pool
 class ErasurePool(Pool):
-    def __init__(self, service, name, erasure_code_profile="default"):
+    def __init__(self, service, name, erasure_code_profile="default",
+                 percent_data=10.0):
         super(ErasurePool, self).__init__(service=service, name=name)
         self.erasure_code_profile = erasure_code_profile
+        self.percent_data = percent_data
 
     def create(self):
         if not pool_exists(self.service, self.name):
-            # Try to find the erasure profile information so we can properly size the pgs
-            erasure_profile = get_erasure_profile(service=self.service, name=self.erasure_code_profile)
+            # Try to find the erasure profile information in order to properly
+            # size the number of placement groups. The size of an erasure
+            # coded placement group is calculated as k+m.
+            erasure_profile = get_erasure_profile(self.service,
+                                                  self.erasure_code_profile)
 
             # Check for errors
             if erasure_profile is None:
-                log(message='Failed to discover erasure_profile named={}'.format(self.erasure_code_profile),
-                    level=ERROR)
-                raise PoolCreationError(message='unable to find erasure profile {}'.format(self.erasure_code_profile))
+                msg = ("Failed to discover erasure profile named "
+                       "{}".format(self.erasure_code_profile))
+                log(msg, level=ERROR)
+                raise PoolCreationError(msg)
             if 'k' not in erasure_profile or 'm' not in erasure_profile:
                 # Error
-                log(message='Unable to find k (data chunks) or m (coding chunks) in {}'.format(erasure_profile),
-                    level=ERROR)
-                raise PoolCreationError(
-                    message='unable to find k (data chunks) or m (coding chunks) in {}'.format(erasure_profile))
+                msg = ("Unable to find k (data chunks) or m (coding chunks) "
+                       "in erasure profile {}".format(erasure_profile))
+                log(msg, level=ERROR)
+                raise PoolCreationError(msg)
 
-            pgs = self.get_pgs(int(erasure_profile['k']) + int(erasure_profile['m']))
+            k = int(erasure_profile['k'])
+            m = int(erasure_profile['m'])
+            pgs = self.get_pgs(k + m, self.percent_data)
             # Create it
-            cmd = ['ceph', '--id', self.service, 'osd', 'pool', 'create', self.name, str(pgs), str(pgs),
+            cmd = ['ceph', '--id', self.service, 'osd', 'pool', 'create',
+                   self.name, str(pgs), str(pgs),
                    'erasure', self.erasure_code_profile]
             try:
                 check_call(cmd)
@@ -900,18 +987,20 @@ def ensure_ceph_storage(service, pool, rbd_img, sizemb, mount_point,
             service_start(svc)
 
 
-def ensure_ceph_keyring(service, user=None, group=None, relation='ceph'):
+def ensure_ceph_keyring(service, user=None, group=None,
+                        relation='ceph', key=None):
     """Ensures a ceph keyring is created for a named service and optionally
     ensures user and group ownership.
 
-    Returns False if no ceph key is available in relation state.
+    @returns boolean: Flag to indicate whether a key was successfully written
+                      to disk based on either relation data or a supplied key
     """
-    key = None
-    for rid in relation_ids(relation):
-        for unit in related_units(rid):
-            key = relation_get('key', rid=rid, unit=unit)
-            if key:
-                break
+    if not key:
+        for rid in relation_ids(relation):
+            for unit in related_units(rid):
+                key = relation_get('key', rid=rid, unit=unit)
+                if key:
+                    break
 
     if not key:
         return False
@@ -957,16 +1046,33 @@ class CephBrokerRq(object):
             self.request_id = str(uuid.uuid1())
         self.ops = []
 
-    def add_op_create_pool(self, name, replica_count=3, pg_num=None):
+    def add_op_request_access_to_group(self, name, namespace=None,
+                                       permission=None, key_name=None):
+        """
+        Adds the requested permissions to the current service's Ceph key,
+        allowing the key to access only the specified pools
+        """
+        self.ops.append({'op': 'add-permissions-to-key', 'group': name,
+                         'namespace': namespace, 'name': key_name or service_name(),
+                         'group-permission': permission})
+
+    def add_op_create_pool(self, name, replica_count=3, pg_num=None,
+                           weight=None, group=None, namespace=None):
         """Adds an operation to create a pool.
 
         @param pg_num setting:  optional setting. If not provided, this value
         will be calculated by the broker based on how many OSDs are in the
         cluster at the time of creation. Note that, if provided, this value
         will be capped at the current available maximum.
+        @param weight: the percentage of data the pool makes up
         """
+        if pg_num and weight:
+            raise ValueError('pg_num and weight are mutually exclusive')
+
         self.ops.append({'op': 'create-pool', 'name': name,
-                         'replicas': replica_count, 'pg_num': pg_num})
+                         'replicas': replica_count, 'pg_num': pg_num,
+                         'weight': weight, 'group': group,
+                         'group-namespace': namespace})
 
     def set_ops(self, ops):
         """Set request ops to provided value.
@@ -984,7 +1090,7 @@ class CephBrokerRq(object):
     def _ops_equal(self, other):
         if len(self.ops) == len(other.ops):
             for req_no in range(0, len(self.ops)):
-                for key in ['replicas', 'name', 'op', 'pg_num']:
+                for key in ['replicas', 'name', 'op', 'pg_num', 'weight']:
                     if self.ops[req_no].get(key) != other.ops[req_no].get(key):
                         return False
         else:
