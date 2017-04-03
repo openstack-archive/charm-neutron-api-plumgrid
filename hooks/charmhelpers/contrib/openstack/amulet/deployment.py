@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import logging
 import re
@@ -43,9 +41,6 @@ class OpenStackAmuletDeployment(AmuletDeployment):
         self.openstack = openstack
         self.source = source
         self.stable = stable
-        # Note(coreycb): this needs to be changed when new next branches come
-        # out.
-        self.current_next = "trusty"
 
     def get_logger(self, name="deployment-logger", level=logging.DEBUG):
         """Get a logger object that will log to stdout."""
@@ -72,43 +67,78 @@ class OpenStackAmuletDeployment(AmuletDeployment):
 
         self.log.info('OpenStackAmuletDeployment:  determine branch locations')
 
-        # Charms outside the lp:~openstack-charmers namespace
-        base_charms = ['mysql', 'mongodb', 'nrpe']
-
-        # Force these charms to current series even when using an older series.
-        # ie. Use trusty/nrpe even when series is precise, as the P charm
-        # does not possess the necessary external master config and hooks.
-        force_series_current = ['nrpe']
-
-        if self.series in ['precise', 'trusty']:
-            base_series = self.series
-        else:
-            base_series = self.current_next
+        # Charms outside the ~openstack-charmers
+        base_charms = {
+            'mysql': ['trusty'],
+            'mongodb': ['trusty'],
+            'nrpe': ['trusty', 'xenial'],
+        }
 
         for svc in other_services:
-            if svc['name'] in force_series_current:
-                base_series = self.current_next
             # If a location has been explicitly set, use it
             if svc.get('location'):
                 continue
-            if self.stable:
-                temp = 'lp:charms/{}/{}'
-                svc['location'] = temp.format(base_series,
-                                              svc['name'])
+            if svc['name'] in base_charms:
+                # NOTE: not all charms have support for all series we
+                #       want/need to test against, so fix to most recent
+                #       that each base charm supports
+                target_series = self.series
+                if self.series not in base_charms[svc['name']]:
+                    target_series = base_charms[svc['name']][-1]
+                svc['location'] = 'cs:{}/{}'.format(target_series,
+                                                    svc['name'])
+            elif self.stable:
+                svc['location'] = 'cs:{}/{}'.format(self.series,
+                                                    svc['name'])
             else:
-                if svc['name'] in base_charms:
-                    temp = 'lp:charms/{}/{}'
-                    svc['location'] = temp.format(base_series,
-                                                  svc['name'])
-                else:
-                    temp = 'lp:~openstack-charmers/charms/{}/{}/next'
-                    svc['location'] = temp.format(self.current_next,
-                                                  svc['name'])
+                svc['location'] = 'cs:~openstack-charmers-next/{}/{}'.format(
+                    self.series,
+                    svc['name']
+                )
 
         return other_services
 
-    def _add_services(self, this_service, other_services):
-        """Add services to the deployment and set openstack-origin/source."""
+    def _add_services(self, this_service, other_services, use_source=None,
+                      no_origin=None):
+        """Add services to the deployment and optionally set
+        openstack-origin/source.
+
+        :param this_service dict: Service dictionary describing the service
+                                  whose amulet tests are being run
+        :param other_services dict: List of service dictionaries describing
+                                    the services needed to support the target
+                                    service
+        :param use_source list: List of services which use the 'source' config
+                                option rather than 'openstack-origin'
+        :param no_origin list: List of services which do not support setting
+                               the Cloud Archive.
+        Service Dict:
+            {
+                'name': str charm-name,
+                'units': int number of units,
+                'constraints': dict of juju constraints,
+                'location': str location of charm,
+            }
+        eg
+        this_service = {
+            'name': 'openvswitch-odl',
+            'constraints': {'mem': '8G'},
+        }
+        other_services = [
+            {
+                'name': 'nova-compute',
+                'units': 2,
+                'constraints': {'mem': '4G'},
+                'location': cs:~bob/xenial/nova-compute
+            },
+            {
+                'name': 'mysql',
+                'constraints': {'mem': '2G'},
+            },
+            {'neutron-api-odl'}]
+        use_source = ['mysql']
+        no_origin = ['neutron-api-odl']
+        """
         self.log.info('OpenStackAmuletDeployment:  adding services')
 
         other_services = self._determine_branch_locations(other_services)
@@ -119,16 +149,22 @@ class OpenStackAmuletDeployment(AmuletDeployment):
         services = other_services
         services.append(this_service)
 
+        use_source = use_source or []
+        no_origin = no_origin or []
+
         # Charms which should use the source config option
-        use_source = ['mysql', 'mongodb', 'rabbitmq-server', 'ceph',
-                      'ceph-osd', 'ceph-radosgw', 'ceph-mon']
+        use_source = list(set(
+            use_source + ['mysql', 'mongodb', 'rabbitmq-server', 'ceph',
+                          'ceph-osd', 'ceph-radosgw', 'ceph-mon',
+                          'ceph-proxy', 'percona-cluster', 'lxd']))
 
         # Charms which can not use openstack-origin, ie. many subordinates
-        no_origin = ['cinder-ceph', 'hacluster', 'neutron-openvswitch', 'nrpe',
-                     'openvswitch-odl', 'neutron-api-odl', 'odl-controller',
-                     'cinder-backup', 'nexentaedge-data',
-                     'nexentaedge-iscsi-gw', 'nexentaedge-swift-gw',
-                     'cinder-nexentaedge', 'nexentaedge-mgmt']
+        no_origin = list(set(
+            no_origin + ['cinder-ceph', 'hacluster', 'neutron-openvswitch',
+                         'nrpe', 'openvswitch-odl', 'neutron-api-odl',
+                         'odl-controller', 'cinder-backup', 'nexentaedge-data',
+                         'nexentaedge-iscsi-gw', 'nexentaedge-swift-gw',
+                         'cinder-nexentaedge', 'nexentaedge-mgmt']))
 
         if self.openstack:
             for svc in services:
@@ -224,28 +260,21 @@ class OpenStackAmuletDeployment(AmuletDeployment):
            release.
            """
         # Must be ordered by OpenStack release (not by Ubuntu release):
-        (self.precise_essex, self.precise_folsom, self.precise_grizzly,
-         self.precise_havana, self.precise_icehouse,
-         self.trusty_icehouse, self.trusty_juno, self.utopic_juno,
-         self.trusty_kilo, self.vivid_kilo, self.trusty_liberty,
-         self.wily_liberty, self.trusty_mitaka,
-         self.xenial_mitaka) = range(14)
+        (self.trusty_icehouse, self.trusty_kilo, self.trusty_liberty,
+         self.trusty_mitaka, self.xenial_mitaka, self.xenial_newton,
+         self.yakkety_newton, self.xenial_ocata, self.zesty_ocata) = range(9)
 
         releases = {
-            ('precise', None): self.precise_essex,
-            ('precise', 'cloud:precise-folsom'): self.precise_folsom,
-            ('precise', 'cloud:precise-grizzly'): self.precise_grizzly,
-            ('precise', 'cloud:precise-havana'): self.precise_havana,
-            ('precise', 'cloud:precise-icehouse'): self.precise_icehouse,
             ('trusty', None): self.trusty_icehouse,
-            ('trusty', 'cloud:trusty-juno'): self.trusty_juno,
             ('trusty', 'cloud:trusty-kilo'): self.trusty_kilo,
             ('trusty', 'cloud:trusty-liberty'): self.trusty_liberty,
             ('trusty', 'cloud:trusty-mitaka'): self.trusty_mitaka,
-            ('utopic', None): self.utopic_juno,
-            ('vivid', None): self.vivid_kilo,
-            ('wily', None): self.wily_liberty,
-            ('xenial', None): self.xenial_mitaka}
+            ('xenial', None): self.xenial_mitaka,
+            ('xenial', 'cloud:xenial-newton'): self.xenial_newton,
+            ('xenial', 'cloud:xenial-ocata'): self.xenial_ocata,
+            ('yakkety', None): self.yakkety_newton,
+            ('zesty', None): self.zesty_ocata,
+        }
         return releases[(self.series, self.openstack)]
 
     def _get_openstack_release_string(self):
@@ -254,15 +283,10 @@ class OpenStackAmuletDeployment(AmuletDeployment):
            Return a string representing the openstack release.
            """
         releases = OrderedDict([
-            ('precise', 'essex'),
-            ('quantal', 'folsom'),
-            ('raring', 'grizzly'),
-            ('saucy', 'havana'),
             ('trusty', 'icehouse'),
-            ('utopic', 'juno'),
-            ('vivid', 'kilo'),
-            ('wily', 'liberty'),
             ('xenial', 'mitaka'),
+            ('yakkety', 'newton'),
+            ('zesty', 'ocata'),
         ])
         if self.openstack:
             os_origin = self.openstack.split(':')[1]
