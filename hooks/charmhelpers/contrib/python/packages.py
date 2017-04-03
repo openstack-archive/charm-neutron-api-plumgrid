@@ -3,21 +3,20 @@
 
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import os
+import six
 import subprocess
 import sys
 
@@ -41,7 +40,10 @@ def pip_execute(*args, **kwargs):
             from pip import main as _pip_execute
         except ImportError:
             apt_update()
-            apt_install('python-pip')
+            if six.PY2:
+                apt_install('python-pip')
+            else:
+                apt_install('python3-pip')
             from pip import main as _pip_execute
         _pip_execute(*args, **kwargs)
     finally:
@@ -80,7 +82,8 @@ def pip_install_requirements(requirements, constraints=None, **options):
     pip_execute(command)
 
 
-def pip_install(package, fatal=False, upgrade=False, venv=None, **options):
+def pip_install(package, fatal=False, upgrade=False, venv=None,
+                constraints=None, **options):
     """Install a python package"""
     if venv:
         venv_python = os.path.join(venv, 'bin/pip')
@@ -94,6 +97,9 @@ def pip_install(package, fatal=False, upgrade=False, venv=None, **options):
 
     if upgrade:
         command.append('--upgrade')
+
+    if constraints:
+        command.extend(['-c', constraints])
 
     if isinstance(package, list):
         command.extend(package)
@@ -134,7 +140,10 @@ def pip_list():
 
 def pip_create_virtualenv(path=None):
     """Create an isolated Python environment."""
-    apt_install('python-virtualenv')
+    if six.PY2:
+        apt_install('python-virtualenv')
+    else:
+        apt_install('python3-virtualenv')
 
     if path:
         venv_path = path

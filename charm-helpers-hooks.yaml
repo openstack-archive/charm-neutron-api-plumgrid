@@ -10,3 +10,4 @@ include:
     - contrib.python
     - contrib.storage
     - payload
+    - osplatform

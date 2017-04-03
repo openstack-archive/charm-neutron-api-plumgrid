@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # Various utilies for dealing with Neutron and the renaming from Quantum.
 
@@ -25,7 +23,10 @@ from charmhelpers.core.hookenv import (
     ERROR,
 )
 
-from charmhelpers.contrib.openstack.utils import os_release
+from charmhelpers.contrib.openstack.utils import (
+    os_release,
+    CompareOpenStackReleases,
+)
 
 
 def headers_package():
@@ -33,6 +34,7 @@ def headers_package():
     for building DKMS package"""
     kver = check_output(['uname', '-r']).decode('UTF-8').strip()
     return 'linux-headers-%s' % kver
+
 
 QUANTUM_CONF_DIR = '/etc/quantum'
 
@@ -92,6 +94,7 @@ def quantum_plugins():
             'server_services': ['quantum-server']
         }
     }
+
 
 NEUTRON_CONF_DIR = '/etc/neutron'
 
@@ -198,7 +201,8 @@ def neutron_plugins():
         },
         'plumgrid': {
             'config': '/etc/neutron/plugins/plumgrid/plumgrid.ini',
-            'driver': 'neutron.plugins.plumgrid.plumgrid_plugin.plumgrid_plugin.NeutronPluginPLUMgridV2',
+            'driver': ('neutron.plugins.plumgrid.plumgrid_plugin'
+                       '.plumgrid_plugin.NeutronPluginPLUMgridV2'),
             'contexts': [
                 context.SharedDBContext(user=config('database-user'),
                                         database=config('database'),
@@ -225,7 +229,7 @@ def neutron_plugins():
             'server_services': ['neutron-server']
         }
     }
-    if release >= 'icehouse':
+    if CompareOpenStackReleases(release) >= 'icehouse':
         # NOTE: patch in ml2 plugin for icehouse onwards
         plugins['ovs']['config'] = '/etc/neutron/plugins/ml2/ml2_conf.ini'
         plugins['ovs']['driver'] = 'neutron.plugins.ml2.plugin.Ml2Plugin'
@@ -233,10 +237,10 @@ def neutron_plugins():
                                              'neutron-plugin-ml2']
         # NOTE: patch in vmware renames nvp->nsx for icehouse onwards
         plugins['nvp'] = plugins['nsx']
-    if release >= 'kilo':
+    if CompareOpenStackReleases(release) >= 'kilo':
         plugins['midonet']['driver'] = (
             'neutron.plugins.midonet.plugin.MidonetPluginV2')
-    if release >= 'liberty':
+    if CompareOpenStackReleases(release) >= 'liberty':
         plugins['midonet']['driver'] = (
             'midonet.neutron.plugin_v1.MidonetPluginV2')
         plugins['midonet']['server_packages'].remove(
@@ -244,9 +248,16 @@ def neutron_plugins():
         plugins['midonet']['server_packages'].append(
             'python-networking-midonet')
         plugins['plumgrid']['driver'] = (
-            'networking_plumgrid.neutron.plugins.plugin.NeutronPluginPLUMgridV2')
+            'networking_plumgrid.neutron.plugins'
+            '.plugin.NeutronPluginPLUMgridV2')
         plugins['plumgrid']['server_packages'].remove(
             'neutron-plugin-plumgrid')
+    if CompareOpenStackReleases(release) >= 'mitaka':
+        plugins['nsx']['server_packages'].remove('neutron-plugin-vmware')
+        plugins['nsx']['server_packages'].append('python-vmware-nsx')
+        plugins['nsx']['config'] = '/etc/neutron/nsx.ini'
+        plugins['vsp']['driver'] = (
+            'nuage_neutron.plugins.nuage.plugin.NuagePlugin')
     return plugins
 
 
