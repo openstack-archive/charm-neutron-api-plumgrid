@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import io
 import json
@@ -150,7 +148,8 @@ class AmuletUtils(object):
 
             for service_name in services_list:
                 if (self.ubuntu_releases.index(release) >= systemd_switch or
-                        service_name in ['rabbitmq-server', 'apache2']):
+                        service_name in ['rabbitmq-server', 'apache2',
+                                         'memcached']):
                     # init is systemd (or regular sysv)
                     cmd = 'sudo service {} status'.format(service_name)
                     output, code = sentry_unit.run(cmd)
@@ -548,7 +547,7 @@ class AmuletUtils(object):
             raise if it is present.
         :returns: List of process IDs
         """
-        cmd = 'pidof -x {}'.format(process_name)
+        cmd = 'pidof -x "{}"'.format(process_name)
         if not expect_success:
             cmd += " || exit 0 && exit 1"
         output, code = sentry_unit.run(cmd)
@@ -786,37 +785,30 @@ class AmuletUtils(object):
         generating test messages which need to be unique-ish."""
         return '[{}-{}]'.format(uuid.uuid4(), time.time())
 
-# amulet juju action helpers:
+    # amulet juju action helpers:
     def run_action(self, unit_sentry, action,
                    _check_output=subprocess.check_output,
                    params=None):
-        """Run the named action on a given unit sentry.
+        """Translate to amulet's built in run_action(). Deprecated.
+
+        Run the named action on a given unit sentry.
 
         params a dict of parameters to use
-        _check_output parameter is used for dependency injection.
+        _check_output parameter is no longer used
 
         @return action_id.
         """
-        unit_id = unit_sentry.info["unit_name"]
-        command = ["juju", "action", "do", "--format=json", unit_id, action]
-        if params is not None:
-            for key, value in params.iteritems():
-                command.append("{}={}".format(key, value))
-        self.log.info("Running command: %s\n" % " ".join(command))
-        output = _check_output(command, universal_newlines=True)
-        data = json.loads(output)
-        action_id = data[u'Action queued with id']
-        return action_id
+        self.log.warn('charmhelpers.contrib.amulet.utils.run_action has been '
+                      'deprecated for amulet.run_action')
+        return unit_sentry.run_action(action, action_args=params)
 
     def wait_on_action(self, action_id, _check_output=subprocess.check_output):
         """Wait for a given action, returning if it completed or not.
 
-        _check_output parameter is used for dependency injection.
+        action_id a string action uuid
+        _check_output parameter is no longer used
         """
-        command = ["juju", "action", "fetch", "--format=json", "--wait=0",
-                   action_id]
-        output = _check_output(command, universal_newlines=True)
-        data = json.loads(output)
+        data = amulet.actions.get_action_output(action_id, full_output=True)
         return data.get(u"status") == "completed"
 
     def status_get(self, unit):

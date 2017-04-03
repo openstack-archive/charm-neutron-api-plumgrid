@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # Common python helper functions used for OpenStack charms.
 from collections import OrderedDict
@@ -35,9 +33,7 @@ import yaml
 
 from charmhelpers.contrib.network import ip
 
-from charmhelpers.core import (
-    unitdata,
-)
+from charmhelpers.core import unitdata
 
 from charmhelpers.core.hookenv import (
     action_fail,
@@ -51,9 +47,13 @@ from charmhelpers.core.hookenv import (
     related_units,
     relation_ids,
     relation_set,
+    service_name,
     status_set,
-    hook_name
+    hook_name,
+    application_version_set,
 )
+
+from charmhelpers.core.strutils import BasicStringComparator
 
 from charmhelpers.contrib.storage.linux.lvm import (
     deactivate_lvm_volume_group,
@@ -81,7 +81,12 @@ from charmhelpers.core.host import (
     service_resume,
     restart_on_change_helper,
 )
-from charmhelpers.fetch import apt_install, apt_cache, install_remote
+from charmhelpers.fetch import (
+    apt_install,
+    apt_cache,
+    install_remote,
+    get_upstream_version
+)
 from charmhelpers.contrib.storage.linux.utils import is_block_device, zap_disk
 from charmhelpers.contrib.storage.linux.loopback import ensure_loopback_device
 from charmhelpers.contrib.openstack.exceptions import OSContextError
@@ -91,6 +96,22 @@ CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
 
 DISTRO_PROPOSED = ('deb http://archive.ubuntu.com/ubuntu/ %s-proposed '
                    'restricted main multiverse universe')
+
+OPENSTACK_RELEASES = (
+    'diablo',
+    'essex',
+    'folsom',
+    'grizzly',
+    'havana',
+    'icehouse',
+    'juno',
+    'kilo',
+    'liberty',
+    'mitaka',
+    'newton',
+    'ocata',
+    'pike',
+)
 
 UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('oneiric', 'diablo'),
@@ -104,7 +125,7 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('wily', 'liberty'),
     ('xenial', 'mitaka'),
     ('yakkety', 'newton'),
-    ('zebra', 'ocata'),  # TODO: upload with real Z name
+    ('zesty', 'ocata'),
 ])
 
 
@@ -146,7 +167,9 @@ SWIFT_CODENAMES = OrderedDict([
     ('mitaka',
         ['2.5.0', '2.6.0', '2.7.0']),
     ('newton',
-        ['2.8.0']),
+        ['2.8.0', '2.9.0', '2.10.0']),
+    ('ocata',
+        ['2.11.0', '2.12.0', '2.13.0']),
 ])
 
 # >= Liberty version->codename mapping
@@ -207,7 +230,39 @@ PACKAGE_CODENAMES = {
     ]),
 }
 
+GIT_DEFAULT_REPOS = {
+    'requirements': 'git://github.com/openstack/requirements',
+    'cinder': 'git://github.com/openstack/cinder',
+    'glance': 'git://github.com/openstack/glance',
+    'horizon': 'git://github.com/openstack/horizon',
+    'keystone': 'git://github.com/openstack/keystone',
+    'networking-hyperv': 'git://github.com/openstack/networking-hyperv',
+    'neutron': 'git://github.com/openstack/neutron',
+    'neutron-fwaas': 'git://github.com/openstack/neutron-fwaas',
+    'neutron-lbaas': 'git://github.com/openstack/neutron-lbaas',
+    'neutron-vpnaas': 'git://github.com/openstack/neutron-vpnaas',
+    'nova': 'git://github.com/openstack/nova',
+}
+
+GIT_DEFAULT_BRANCHES = {
+    'liberty': 'stable/liberty',
+    'mitaka': 'stable/mitaka',
+    'newton': 'stable/newton',
+    'master': 'master',
+}
+
 DEFAULT_LOOPBACK_SIZE = '5G'
+
+
+class CompareOpenStackReleases(BasicStringComparator):
+    """Provide comparisons of OpenStack releases.
+
+    Use in the form of
+
+    if CompareOpenStackReleases(release) > 'mitaka':
+        # do something with mitaka
+    """
+    _list = OPENSTACK_RELEASES
 
 
 def error_out(msg):
@@ -384,17 +439,30 @@ def get_os_version_package(pkg, fatal=True):
 os_rel = None
 
 
-def os_release(package, base='essex'):
+def reset_os_release():
+    '''Unset the cached os_release version'''
+    global os_rel
+    os_rel = None
+
+
+def os_release(package, base='essex', reset_cache=False):
     '''
     Returns OpenStack release codename from a cached global.
+
+    If reset_cache then unset the cached os_release version and return the
+    freshly determined version.
+
     If the codename can not be determined from either an installed package or
     the installation source, the earliest release supported by the charm should
     be returned.
     '''
     global os_rel
+    if reset_cache:
+        reset_os_release()
     if os_rel:
         return os_rel
-    os_rel = (get_os_codename_package(package, fatal=False) or
+    os_rel = (git_os_codename_install_source(config('openstack-origin-git')) or
+              get_os_codename_package(package, fatal=False) or
               get_os_codename_install_source(config('openstack-origin')) or
               base)
     return os_rel
@@ -508,6 +576,9 @@ def configure_installation_source(rel):
             'newton': 'xenial-updates/newton',
             'newton/updates': 'xenial-updates/newton',
             'newton/proposed': 'xenial-proposed/newton',
+            'ocata': 'xenial-updates/ocata',
+            'ocata/updates': 'xenial-updates/ocata',
+            'ocata/proposed': 'xenial-proposed/ocata',
         }
 
         try:
@@ -641,6 +712,7 @@ def clean_storage(block_device):
     else:
         zap_disk(block_device)
 
+
 is_ip = ip.is_ip
 ns_query = ip.ns_query
 get_host_ip = ip.get_host_ip
@@ -700,7 +772,86 @@ def git_install_requested():
     return config('openstack-origin-git') is not None
 
 
-requirements_dir = None
+def git_os_codename_install_source(projects_yaml):
+    """
+    Returns OpenStack codename of release being installed from source.
+    """
+    if git_install_requested():
+        projects = _git_yaml_load(projects_yaml)
+
+        if projects in GIT_DEFAULT_BRANCHES.keys():
+            if projects == 'master':
+                return 'ocata'
+            return projects
+
+        if 'release' in projects:
+            if projects['release'] == 'master':
+                return 'ocata'
+            return projects['release']
+
+    return None
+
+
+def git_default_repos(projects_yaml):
+    """
+    Returns default repos if a default openstack-origin-git value is specified.
+    """
+    service = service_name()
+    core_project = service
+
+    for default, branch in GIT_DEFAULT_BRANCHES.iteritems():
+        if projects_yaml == default:
+
+            # add the requirements repo first
+            repo = {
+                'name': 'requirements',
+                'repository': GIT_DEFAULT_REPOS['requirements'],
+                'branch': branch,
+            }
+            repos = [repo]
+
+            # neutron-* and nova-* charms require some additional repos
+            if service in ['neutron-api', 'neutron-gateway',
+                           'neutron-openvswitch']:
+                core_project = 'neutron'
+                if service == 'neutron-api':
+                    repo = {
+                        'name': 'networking-hyperv',
+                        'repository': GIT_DEFAULT_REPOS['networking-hyperv'],
+                        'branch': branch,
+                    }
+                    repos.append(repo)
+                for project in ['neutron-fwaas', 'neutron-lbaas',
+                                'neutron-vpnaas', 'nova']:
+                    repo = {
+                        'name': project,
+                        'repository': GIT_DEFAULT_REPOS[project],
+                        'branch': branch,
+                    }
+                    repos.append(repo)
+
+            elif service in ['nova-cloud-controller', 'nova-compute']:
+                core_project = 'nova'
+                repo = {
+                    'name': 'neutron',
+                    'repository': GIT_DEFAULT_REPOS['neutron'],
+                    'branch': branch,
+                }
+                repos.append(repo)
+            elif service == 'openstack-dashboard':
+                core_project = 'horizon'
+
+            # finally add the current service's core project repo
+            repo = {
+                'name': core_project,
+                'repository': GIT_DEFAULT_REPOS[core_project],
+                'branch': branch,
+            }
+            repos.append(repo)
+
+            return yaml.dump(dict(repositories=repos, release=default))
+
+    return projects_yaml
 
 
 def _git_yaml_load(projects_yaml):
@@ -711,6 +862,9 @@ def _git_yaml_load(projects_yaml):
         return None
 
     return yaml.load(projects_yaml)
+
+
+requirements_dir = None
 
 
 def git_clone_and_install(projects_yaml, core_project):
@@ -760,6 +914,7 @@ def git_clone_and_install(projects_yaml, core_project):
         pip_install(p, upgrade=True, proxy=http_proxy,
                     venv=os.path.join(parent_dir, 'venv'))
 
+    constraints = None
     for p in projects['repositories']:
         repo = p['repository']
         branch = p['branch']
@@ -771,10 +926,19 @@ def git_clone_and_install(projects_yaml, core_project):
                                                      parent_dir, http_proxy,
                                                      update_requirements=False)
             requirements_dir = repo_dir
+            constraints = os.path.join(repo_dir, "upper-constraints.txt")
+            # upper-constraints didn't exist until after icehouse
+            if not os.path.isfile(constraints):
+                constraints = None
+            # use constraints unless project yaml sets use_constraints to false
+            if 'use_constraints' in projects.keys():
+                if not projects['use_constraints']:
+                    constraints = None
         else:
             repo_dir = _git_clone_and_install_single(repo, branch, depth,
                                                      parent_dir, http_proxy,
-                                                     update_requirements=True)
+                                                     update_requirements=True,
+                                                     constraints=constraints)
 
     os.environ = old_environ
 
@@ -796,6 +960,8 @@ def _git_validate_projects_yaml(projects, core_project):
     if projects['repositories'][-1]['name'] != core_project:
         error_out('{} git repo must be specified last'.format(core_project))
 
+    _git_ensure_key_exists('release', projects)
+
 
 def _git_ensure_key_exists(key, keys):
     """
@@ -806,7 +972,7 @@ def _git_ensure_key_exists(key, keys):
 
 
 def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
-                                  update_requirements):
+                                  update_requirements, constraints=None):
     """
     Clone and install a single git repository.
     """
@@ -829,9 +995,10 @@ def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
 
     juju_log('Installing git repo from dir: {}'.format(repo_dir))
     if http_proxy:
-        pip_install(repo_dir, proxy=http_proxy, venv=venv)
+        pip_install(repo_dir, proxy=http_proxy, venv=venv,
+                    constraints=constraints)
     else:
-        pip_install(repo_dir, venv=venv)
+        pip_install(repo_dir, venv=venv, constraints=constraints)
 
     return repo_dir
 
@@ -911,6 +1078,7 @@ def git_generate_systemd_init_files(templates_dir):
     script generation, which is used by the OpenStack packages.
     """
     for f in os.listdir(templates_dir):
+        # Create the init script and systemd unit file from the template
         if f.endswith(".init.in"):
             init_in_file = f
             init_file = f[:-8]
@@ -925,7 +1093,8 @@ def git_generate_systemd_init_files(templates_dir):
 
             shutil.copyfile(init_in_source, init_source)
             with open(init_source, 'a') as outfile:
-                template = '/usr/share/openstack-pkg-tools/init-script-template'
+                template = ('/usr/share/openstack-pkg-tools/'
+                            'init-script-template')
                 with open(template) as infile:
                     outfile.write('\n\n{}'.format(infile.read()))
 
@@ -936,9 +1105,75 @@ def git_generate_systemd_init_files(templates_dir):
                 os.remove(init_dest)
             if os.path.exists(service_dest):
                 os.remove(service_dest)
-            shutil.move(init_source, init_dest)
-            shutil.move(service_source, service_dest)
+            shutil.copyfile(init_source, init_dest)
+            shutil.copyfile(service_source, service_dest)
             os.chmod(init_dest, 0o755)
+
+    for f in os.listdir(templates_dir):
+        # If there's a service.in file, use it instead of the generated one
+        if f.endswith(".service.in"):
+            service_in_file = f
+            service_file = f[:-3]
+
+            service_in_source = os.path.join(templates_dir, service_in_file)
+            service_source = os.path.join(templates_dir, service_file)
+            service_dest = os.path.join('/lib/systemd/system', service_file)
+
+            shutil.copyfile(service_in_source, service_source)
+
+            if os.path.exists(service_dest):
+                os.remove(service_dest)
+            shutil.copyfile(service_source, service_dest)
+
+    for f in os.listdir(templates_dir):
+        # Generate the systemd unit if there's no existing .service.in
+        if f.endswith(".init.in"):
+            init_in_file = f
+            init_file = f[:-8]
+            service_in_file = "{}.service.in".format(init_file)
+            service_file = "{}.service".format(init_file)
+
+            init_in_source = os.path.join(templates_dir, init_in_file)
+            service_in_source = os.path.join(templates_dir, service_in_file)
+            service_source = os.path.join(templates_dir, service_file)
+            service_dest = os.path.join('/lib/systemd/system', service_file)
+
+            if not os.path.exists(service_in_source):
+                cmd = ['pkgos-gen-systemd-unit', init_in_source]
+                subprocess.check_call(cmd)
+
+                if os.path.exists(service_dest):
+                    os.remove(service_dest)
+                shutil.copyfile(service_source, service_dest)
+
+
+def git_determine_usr_bin():
+    """Return the /usr/bin path for Apache2 config.
+
+    The /usr/bin path will be located in the virtualenv if the charm
+    is configured to deploy from source.
+    """
+    if git_install_requested():
+        projects_yaml = config('openstack-origin-git')
+        projects_yaml = git_default_repos(projects_yaml)
+        return os.path.join(git_pip_venv_dir(projects_yaml), 'bin')
+    else:
+        return '/usr/bin'
+
+
+def git_determine_python_path():
+    """Return the python-path for Apache2 config.
+
+    Returns 'None' unless the charm is configured to deploy from source,
+    in which case the path of the virtualenv's site-packages is returned.
+    """
+    if git_install_requested():
+        projects_yaml = config('openstack-origin-git')
+        projects_yaml = git_default_repos(projects_yaml)
+        return os.path.join(git_pip_venv_dir(projects_yaml),
+                            'lib/python2.7/site-packages')
+    else:
+        return None
 
 
 def os_workload_status(configs, required_interfaces, charm_func=None):
@@ -1736,3 +1971,45 @@ def config_flags_parser(config_flags):
         flags[key.strip(post_strippers)] = value.rstrip(post_strippers)
 
     return flags
+
+
+def os_application_version_set(package):
+    '''Set version of application for Juju 2.0 and later'''
+    application_version = get_upstream_version(package)
+    # NOTE(jamespage) if not able to figure out package version, fallback to
+    #                 openstack codename version detection.
+    if not application_version:
+        application_version_set(os_release(package))
+    else:
+        application_version_set(application_version)
+
+
+def enable_memcache(source=None, release=None, package=None):
+    """Determine if memcache should be enabled on the local unit
+
+    @param release: release of OpenStack currently deployed
+    @param package: package to derive OpenStack version deployed
+    @returns boolean Whether memcache should be enabled
+    """
+    _release = None
+    if release:
+        _release = release
+    else:
+        _release = os_release(package, base='icehouse')
+    if not _release:
+        _release = get_os_codename_install_source(source)
+
+    return CompareOpenStackReleases(_release) >= 'mitaka'
+
+
+def token_cache_pkgs(source=None, release=None):
+    """Determine additional packages needed for token caching
+
+    @param source: source string for charm
+    @param release: release of OpenStack currently deployed
+    @returns List of package to enable token caching
+    """
+    packages = []
+    if enable_memcache(source=source, release=release):
+        packages.extend(['memcached', 'python-memcache'])
+    return packages

@@ -1,28 +1,43 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 ''' Helpers for interacting with OpenvSwitch '''
 import subprocess
 import os
+import six
+
+from charmhelpers.fetch import apt_install
+
+
 from charmhelpers.core.hookenv import (
-    log, WARNING
+    log, WARNING, INFO, DEBUG
 )
 from charmhelpers.core.host import (
     service
 )
+
+BRIDGE_TEMPLATE = """\
+# This veth pair is required when neutron data-port is mapped to an existing linux bridge. lp:1635067
+
+auto {linuxbridge_port}
+iface {linuxbridge_port} inet manual
+    pre-up ip link add name {linuxbridge_port} type veth peer name {ovsbridge_port}
+    pre-up ip link set {ovsbridge_port} master {bridge}
+    pre-up ip link set {ovsbridge_port} up
+    up ip link set {linuxbridge_port} up
+    down ip link del {linuxbridge_port}
+"""
 
 
 def add_bridge(name, datapath_type=None):
@@ -60,6 +75,54 @@ def del_bridge_port(name, port):
                            name, port])
     subprocess.check_call(["ip", "link", "set", port, "down"])
     subprocess.check_call(["ip", "link", "set", port, "promisc", "off"])
+
+
+def add_ovsbridge_linuxbridge(name, bridge):
+    ''' Add linux bridge to the named openvswitch bridge
+    :param name: Name of ovs bridge to be added to Linux bridge
+    :param bridge: Name of Linux bridge to be added to ovs bridge
+    :returns: True if veth is added between ovs bridge and linux bridge,
+    False otherwise'''
+    try:
+        import netifaces
+    except ImportError:
+        if six.PY2:
+            apt_install('python-netifaces', fatal=True)
+        else:
+            apt_install('python3-netifaces', fatal=True)
+        import netifaces
+
+    ovsbridge_port = "veth-" + name
+    linuxbridge_port = "veth-" + bridge
+    log('Adding linuxbridge {} to ovsbridge {}'.format(bridge, name),
+        level=INFO)
+    interfaces = netifaces.interfaces()
+    for interface in interfaces:
+        if interface == ovsbridge_port or interface == linuxbridge_port:
+            log('Interface {} already exists'.format(interface), level=INFO)
+            return
+
+    with open('/etc/network/interfaces.d/{}.cfg'.format(
+            linuxbridge_port), 'w') as config:
+        config.write(BRIDGE_TEMPLATE.format(linuxbridge_port=linuxbridge_port,
+                                            ovsbridge_port=ovsbridge_port,
+                                            bridge=bridge))
+
+    subprocess.check_call(["ifup", linuxbridge_port])
+    add_bridge_port(name, linuxbridge_port)
+
+
+def is_linuxbridge_interface(port):
+    ''' Check if the interface is a linuxbridge bridge
+    :param port: Name of an interface to check whether it is a Linux bridge
+    :returns: True if port is a Linux bridge'''
+
+    if os.path.exists('/sys/class/net/' + port + '/bridge'):
+        log('Interface {} is a Linux bridge'.format(port), level=DEBUG)
+        return True
+    else:
+        log('Interface {} is not a Linux bridge'.format(port), level=DEBUG)
+        return False
 
 
 def set_manager(manager):
