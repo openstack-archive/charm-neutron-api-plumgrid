@@ -103,4 +103,4 @@ class NeutronPGContextTest(CharmTestCase):
             'enable_reverse_flow_tap': 'True',
             'nova_metaconfig': 'True',
         }
-        self.assertEquals(expect, napi_ctxt())
+        self.assertEqual(expect, napi_ctxt())
