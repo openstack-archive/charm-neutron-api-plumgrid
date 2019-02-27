@@ -208,7 +208,7 @@ def set_neutron_relation():
         'neutron-plugin-config': neutron_plugin_attribute('plumgrid',
                                                           'config', 'neutron'),
         'service-plugins': ' ',
-        'quota-driver': 'neutron.db.quota_db.DbQuotaDriver',
+        'quota-driver': 'neutron.db.quota.driver.DbQuotaDriver',
     }
 
     relation_set(relation_settings=settings)
